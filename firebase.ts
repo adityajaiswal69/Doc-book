@@ -1,5 +1,5 @@
 // Import the functions you need from the SDKs you need
-import { getApp,getApps, initializeApp } from "firebase/app";
+import { getApp, getApps, initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -11,7 +11,7 @@ const firebaseConfig = {
   projectId: "note-forge-1505c",
   storageBucket: "note-forge-1505c.firebasestorage.app",
   messagingSenderId: "839415845666",
-  appId: "1:839415845666:web:b4f086050d946025564b7b"
+  appId: "1:839415845666:web:b4f086050d946025564b7b",
 };
 
 // Initialize Firebase

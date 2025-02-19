@@ -75,6 +75,7 @@ export function AppSidebar() {
         where("userId", "==", user.emailAddresses[0].toString())
       )
   );
+  console.log(error);
 
   useEffect(() => {
     if (!data) return;
@@ -104,9 +105,10 @@ export function AppSidebar() {
         editor: [],
       }
     );
-
+    console.log(grouped);
     setGroupedData(grouped);
   }, [data]);
+
   return (
     <Sidebar>
       <SidebarContent>
@@ -148,7 +150,8 @@ export function AppSidebar() {
                     <SidebarOption
                       key={doc.id}
                       href={`/doc/${doc.roomId}`}
-                      id={doc.roomId}/>
+                      id={doc.roomId}
+                    />
                   ))}
                 </>
               )}
