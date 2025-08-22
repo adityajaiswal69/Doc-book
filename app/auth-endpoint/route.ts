@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import liveblocks from "@/lib/liveblocks";
-import { adminDb } from "@/firebase-admin";
+import { createServerSupabaseClient } from "@/lib/supabase";
 import { redirect } from "next/navigation";
 
 export async function POST(req: NextRequest) {
   const user = await currentUser();
       
-      if (!user) {
-          redirect("/sign-in");
-      }
+  if (!user) {
+    redirect("/sign-in");
+  }
 
   const { sessionClaims } = await auth();
   const { room } = await req.json();
@@ -22,21 +22,25 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  const usersInRoom = await adminDb
-    .collectionGroup("rooms")
-    .where("userId", "==", sessionClaims?.email)
-    .get();
+  const supabase = createServerSupabaseClient();
 
-  const userInRoom = usersInRoom.docs.find((doc) => doc.id === room);
+  // Check if user has access to this room
+  const { data: userRoom, error } = await supabase
+    .from('user_rooms')
+    .select('*')
+    .eq('user_id', sessionClaims?.email)
+    .eq('room_id', room)
+    .single();
 
-  if (userInRoom?.exists) {
-    session.allow(room, session.FULL_ACCESS);
-    const { body, status } = await session.authorize();
-
-
-
-    return new Response(body, { status });
-  } else{
-    return NextResponse.json({message: "You are not allowed to access this room"}, {status: 403});
+  if (error || !userRoom) {
+    return NextResponse.json(
+      { message: "You are not allowed to access this room" }, 
+      { status: 403 }
+    );
   }
+
+  session.allow(room, session.FULL_ACCESS);
+  const { body, status } = await session.authorize();
+
+  return new Response(body, { status });
 }

@@ -17,35 +17,87 @@ import { Input } from "./ui/input";
 import { Check } from "lucide-react";
 import { Button } from "./ui/button";
 import { FormEvent, useEffect, useState, useTransition } from "react";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/firebase";
-import { title } from "process";
-import { useDocumentData } from "react-firebase-hooks/firestore";
+import { useDocument } from "@/hooks/use-documents";
+import { supabase } from "@/lib/supabase";
 import { ThemeToggle } from "./theme-toggle";
 
 function Header({ id }: { id: string }) {
   const [input, setInput] = useState("");
   const [isUpdating, startTransition] = useTransition();
-  const [data, loading, error] = useDocumentData(doc(db, "documents", id));
+  const { document, loading, error } = useDocument(id);
   const { user } = useUser();
 
   useEffect(() => {
-    if(data) {
-      setInput(data.title);
+    if (document) {
+      setInput(document.title);
     }
-  }, [data]);
+  }, [document]);
+
   const updateTitle = (e: FormEvent) => {
     e.preventDefault();
-    if (input.trim()) {
+    if (input.trim() && document) {
       startTransition(async () => {
-        await updateDoc(doc(db, "documents", id), {
-          title: input,
-        });
+        const { error: updateError } = await supabase
+          .from('documents')
+          .update({ 
+            title: input,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+
+        if (updateError) {
+          console.error('Error updating title:', updateError);
+        }
       });
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-between flex-1 mb-4">
+        <div className="flex items-center gap-x-3">
+          <SidebarTrigger />
+          <div className="h-6 w-32 bg-muted animate-pulse rounded" />
+        </div>
+        <div className="flex items-center gap-x-3">
+          <ThemeToggle />
+          <div>
+            <SignedOut>
+              <SignInButton />
+            </SignedOut>
+            <SignedIn>
+              <UserButton />
+            </SignedIn>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !document) {
+    return (
+      <div className="flex items-center justify-between flex-1 mb-4">
+        <div className="flex items-center gap-x-3">
+          <SidebarTrigger />
+          <div className="text-red-500">Error loading document</div>
+        </div>
+        <div className="flex items-center gap-x-3">
+          <ThemeToggle />
+          <div>
+            <SignedOut>
+              <SignInButton />
+            </SignedOut>
+            <SignedIn>
+              <UserButton />
+            </SignedIn>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center justify-between flex-1  mb-4">
+    <div className="flex items-center justify-between flex-1 mb-4">
       <div className="flex items-center gap-x-3">
         <SidebarTrigger />
         <Popover>
@@ -55,7 +107,11 @@ function Header({ id }: { id: string }) {
               className="flex items-center space-x-2"
               onSubmit={updateTitle}
             >
-              <Input className="outline-none" value={input} onChange={(e) => setInput(e.target.value)} />
+              <Input 
+                className="outline-none" 
+                value={input} 
+                onChange={(e) => setInput(e.target.value)} 
+              />
               <Button
                 variant="outline"
                 size="icon"
@@ -69,17 +125,16 @@ function Header({ id }: { id: string }) {
         </Popover>
       </div>
       <div className="flex items-center gap-x-3">
-          <ThemeToggle/>
+        <ThemeToggle />
         <div>
-        <SignedOut>
-        <SignInButton />
-      </SignedOut>
-      <SignedIn>
-        <UserButton />
-      </SignedIn>
+          <SignedOut>
+            <SignInButton />
+          </SignedOut>
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
         </div>
       </div>
-      
     </div>
   );
 }

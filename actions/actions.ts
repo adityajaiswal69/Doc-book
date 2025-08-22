@@ -1,32 +1,44 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { adminDb } from "@/firebase-admin";
+import { createServerSupabaseClient } from "@/lib/supabase";
 
 export async function createDocument() {
-  const { sessionClaims } = await auth();
+  const { userId } = await auth();
 
-  if (!sessionClaims?.email) {
+  if (!userId) {
     throw new Error("Unauthorized - User must be logged in");
   }
 
-  const docCollectionRef = adminDb.collection("documents");
+  const supabase = createServerSupabaseClient();
 
-  const docRef = await docCollectionRef.add({
-    title: "Untitled Document",
-  });
+  // Create the document
+  const { data: document, error: documentError } = await supabase
+    .from('documents')
+    .insert({
+      title: "Untitled Document",
+    })
+    .select()
+    .single();
 
-  await adminDb
-    .collection("users")
-    .doc(sessionClaims.email)
-    .collection("rooms")
-    .doc(docRef.id)
-    .set({
-      userId: sessionClaims.email,
-      role: "owner", 
-      createdAt: new Date(),
-      roomId: docRef.id,
+  if (documentError) {
+    throw new Error(`Failed to create document: ${documentError.message}`);
+  }
+
+  // Create user room relationship
+  const { error: userRoomError } = await supabase
+    .from('user_rooms')
+    .insert({
+      user_id: userId,
+      room_id: document.id,
+      role: 'owner',
     });
 
-    return { docId: docRef.id };
+  if (userRoomError) {
+    // Clean up the document if user room creation fails
+    await supabase.from('documents').delete().eq('id', document.id);
+    throw new Error(`Failed to create user room: ${userRoomError.message}`);
+  }
+
+  return { docId: document.id };
 }

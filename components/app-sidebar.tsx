@@ -1,6 +1,5 @@
 "use client";
 import { Calendar, Home, Inbox, Search, Settings } from "lucide-react";
-import { useCollection } from "react-firebase-hooks/firestore";
 import {
   Sidebar,
   SidebarContent,
@@ -13,22 +12,10 @@ import {
 } from "@/components/ui/sidebar";
 import { useUser } from "@clerk/nextjs";
 import NewDocumentButton from "./NewDocumentButton";
-import {
-  collectionGroup,
-  DocumentData,
-  query,
-  where,
-} from "firebase/firestore";
-import { db } from "@/firebase";
 import { useEffect, useState } from "react";
 import SidebarOption from "./SidebarOption";
-
-interface RoomDocument extends DocumentData {
-  createdAt: string;
-  role: "owner" | "editor";
-  roomId: string;
-  userId: string;
-}
+import { useDocuments } from "@/hooks/use-documents";
+import { Document, UserRoom } from "@/types/database";
 
 // Menu items.
 const items = [
@@ -61,42 +48,33 @@ const items = [
 
 export function AppSidebar() {
   const { user } = useUser();
+  const { documents, userRooms, loading, error } = useDocuments();
   const [groupedData, setGroupedData] = useState<{
-    owner: RoomDocument[];
-    editor: RoomDocument[];
+    owner: (Document & { roomId: string })[];
+    editor: (Document & { roomId: string })[];
   }>({
     owner: [],
     editor: [],
   });
-  const [data, loading, error] = useCollection(
-    user &&
-      query(
-        collectionGroup(db, "rooms"),
-        where("userId", "==", user.emailAddresses[0].toString())
-      )
-  );
-  console.log(error);
 
   useEffect(() => {
-    if (!data) return;
+    if (!documents || !userRooms) return;
 
-    const grouped = data.docs.reduce<{
-      owner: RoomDocument[];
-      editor: RoomDocument[];
+    const grouped = documents.reduce<{
+      owner: (Document & { roomId: string })[];
+      editor: (Document & { roomId: string })[];
     }>(
-      (acc, curr) => {
-        const roomData = curr.data() as RoomDocument;
-
-        if (roomData.role === "owner") {
-          acc.owner.push({
-            id: curr.id,
-            ...roomData,
-          });
-        } else {
-          acc.editor.push({
-            id: curr.id,
-            ...roomData,
-          });
+      (acc, document) => {
+        const userRoom = userRooms.find(ur => ur.room_id === document.id);
+        
+        if (userRoom) {
+          const docWithRoomId = { ...document, roomId: document.id };
+          
+          if (userRoom.role === "owner") {
+            acc.owner.push(docWithRoomId);
+          } else {
+            acc.editor.push(docWithRoomId);
+          }
         }
         return acc;
       },
@@ -105,9 +83,13 @@ export function AppSidebar() {
         editor: [],
       }
     );
-    console.log(grouped);
+
     setGroupedData(grouped);
-  }, [data]);
+  }, [documents, userRooms]);
+
+  if (error) {
+    console.error("Error loading documents:", error);
+  }
 
   return (
     <Sidebar>
@@ -142,8 +124,10 @@ export function AppSidebar() {
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {groupedData.owner.length === 0 ? (
-                <h1>No doc found</h1>
+              {loading ? (
+                <div className="p-2 text-sm text-muted-foreground">Loading...</div>
+              ) : groupedData.owner.length === 0 ? (
+                <div className="p-2 text-sm text-muted-foreground">No documents found</div>
               ) : (
                 <>
                   {groupedData.owner.map((doc) => (
