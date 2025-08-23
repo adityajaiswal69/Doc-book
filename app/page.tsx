@@ -6,7 +6,7 @@ import { useTransition } from "react";
 import { createDocument } from "@/actions/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Plus, User, Database } from "lucide-react";
+import { FileText, Plus, User, Database, Sparkles, Zap, Shield } from "lucide-react";
 import TestAuth from "@/components/TestAuth";
 import { toast } from "sonner";
 
@@ -34,118 +34,72 @@ export default function HomePage() {
     });
   };
 
+  if (!user) {
+    return <TestAuth />;
+  }
+
   return (
-    <div className="flex-1 flex items-center justify-center bg-background">
-      <div className="max-w-4xl mx-auto px-6 py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Note Forge
-          </h1>
+    <div className="flex-1 flex flex-col items-center justify-center p-6 bg-gradient-to-br from-background to-muted/20">
+      <div className="max-w-4xl w-full space-y-8">
+        {/* Welcome Header */}
+        <div className="text-center space-y-4">
+          <div className="flex items-center justify-center gap-3">
+            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <FileText className="h-6 w-6 text-primary" />
+            </div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              Note Forge
+            </h1>
+          </div>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Your powerful Notion alternative built with Next.js and Supabase. 
-            Create, organize, and collaborate on your notes with ease.
+            Your personal workspace for notes, ideas, and collaboration. 
+            Create, organize, and share your thoughts effortlessly.
           </p>
         </div>
 
-        {/* Test Component */}
-        <div className="mb-12">
-          <TestAuth />
-        </div>
-
-        {/* Status Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Authentication Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">User ID:</span>
-                  <span className="text-sm font-mono">{user?.id ? user.id.substring(0, 8) + '...' : 'Not signed in'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Email:</span>
-                  <span className="text-sm">{user?.email || 'Not signed in'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Session:</span>
-                  <span className="text-sm">{session ? 'Active' : 'No session'}</span>
-                </div>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="group hover:shadow-lg transition-all duration-200 cursor-pointer" onClick={handleCreateDocument}>
+            <CardContent className="p-6 text-center space-y-3">
+              <div className="h-12 w-12 rounded-lg bg-blue-500/10 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                <Plus className="h-6 w-6 text-blue-500" />
               </div>
+              <h3 className="font-semibold">New Document</h3>
+              <p className="text-sm text-muted-foreground">Start with a blank canvas</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                Database Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Supabase URL:</span>
-                  <span className="text-sm font-mono">
-                    {process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Configured' : 'Not set'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Service Key:</span>
-                  <span className="text-sm font-mono">
-                    {process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Configured' : 'Not set'}
-                  </span>
-                </div>
+          <Card className="group hover:shadow-lg transition-all duration-200">
+            <CardContent className="p-6 text-center space-y-3">
+              <div className="h-12 w-12 rounded-lg bg-green-500/10 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                <Sparkles className="h-6 w-6 text-green-500" />
               </div>
+              <h3 className="font-semibold">AI Templates</h3>
+              <p className="text-sm text-muted-foreground">Smart document starters</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Ready to Create
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Start building your knowledge base with your first document
-              </p>
-              <Button 
-                onClick={handleCreateDocument} 
-                disabled={isPending || !user}
-                className="w-full"
-              >
-                {isPending ? (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Creating...
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Create your first document
-                  </div>
-                )}
-              </Button>
+          <Card className="group hover:shadow-lg transition-all duration-200">
+            <CardContent className="p-6 text-center space-y-3">
+              <div className="h-12 w-12 rounded-lg bg-purple-500/10 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                <Zap className="h-6 w-6 text-purple-500" />
+              </div>
+              <h3 className="font-semibold">Quick Notes</h3>
+              <p className="text-sm text-muted-foreground">Capture ideas instantly</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Features */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <FileText className="h-6 w-6" />
-                Rich Text Editing
+                <Shield className="h-5 w-5 text-green-500" />
+                Secure & Private
               </CardTitle>
               <CardDescription>
-                Powerful text editor with real-time collaboration capabilities
+                Your notes are encrypted and private by default
               </CardDescription>
             </CardHeader>
           </Card>
@@ -153,14 +107,41 @@ export default function HomePage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Database className="h-6 w-6" />
-                Secure Storage
+                <Database className="h-5 w-5 text-blue-500" />
+                Real-time Sync
               </CardTitle>
               <CardDescription>
-                Your data is safely stored in Supabase with row-level security
+                Changes sync instantly across all your devices
               </CardDescription>
             </CardHeader>
           </Card>
+        </div>
+
+        {/* Create Button */}
+        <div className="text-center">
+          <Button 
+            onClick={handleCreateDocument}
+            size="lg"
+            className="h-12 px-8 text-lg"
+            disabled={isPending}
+          >
+            {isPending ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current mr-2" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Plus className="h-5 w-5 mr-2" />
+                Create Your First Document
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* User Info */}
+        <div className="text-center text-sm text-muted-foreground">
+          <p>Welcome back, <span className="font-medium text-foreground">{user.user_metadata?.full_name || user.email}</span></p>
         </div>
       </div>
     </div>

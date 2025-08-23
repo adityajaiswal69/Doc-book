@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Save, Loader2 } from "lucide-react";
+import { Save, Loader2, Lock, ChevronDown, FileText } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
 
@@ -196,65 +196,77 @@ export default function Editor() {
   }
 
   return (
-    <div className="flex flex-col h-full p-3 sm:p-6 space-y-3 sm:space-y-4">
-      {/* Header with title and save status */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div className="flex items-center gap-2 sm:gap-4 flex-1">
-          <Input
-            value={title}
-            onChange={(e) => handleTitleChange(e.target.value)}
-            placeholder="Untitled Document"
-            className="text-xl sm:text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0"
-          />
-        </div>
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-          {saving && (
-            <>
-              <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-              <span>Saving...</span>
-            </>
-          )}
-          {(titleChanged || contentChanged) && !saving && (
-            <>
-              <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse"></div>
-              <span>Auto-saving in {contentSaveTimeoutRef.current ? '2s' : titleSaveTimeoutRef.current ? '1.5s' : 'soon'}...</span>
-              <Button 
-                onClick={handleManualSave}
-                size="sm"
-                variant="outline"
-                className="ml-2 h-6 px-2 text-xs"
-              >
-                Save Now
+    <div className="flex flex-col h-full">
+      {/* Header with Notion-style layout */}
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-muted-foreground" />
+              <Input
+                value={title}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                placeholder="Untitled Document"
+                className="text-lg font-semibold border-none shadow-none focus-visible:ring-0 px-0 h-auto min-w-[200px] bg-transparent"
+              />
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Lock className="h-3 w-3" />
+              <span>Private</span>
+              <Button variant="ghost" size="sm" className="h-4 w-4 p-0">
+                <ChevronDown className="h-3 w-3" />
               </Button>
-            </>
-          )}
-          {!titleChanged && !contentChanged && !saving && (
-            <>
-              <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-              <span>All changes saved</span>
-            </>
-          )}
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-muted-foreground">
+              Edited just now
+            </div>
+            
+            <Button variant="ghost" size="sm" className="h-8">
+              <span className="mr-2">Share</span>
+              <div className="h-4 w-4 rounded-full bg-yellow-500"></div>
+            </Button>
+            
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <span className="text-lg">⋯</span>
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Content editor */}
-      <div className="flex-1">
-        <textarea
-          value={content}
-          onChange={(e) => handleContentChange(e.target.value)}
-          placeholder="Start writing your document..."
-          className="w-full h-full resize-none border-none outline-none text-base sm:text-lg leading-relaxed bg-transparent p-0"
-          style={{ minHeight: 'calc(100vh - 200px)' }}
-        />
+      <div className="flex-1 px-6 lg:px-8">
+        <div className="w-full">
+          {/* Centered Document Title */}
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold mb-4">
+              {title || 'Untitled Document'}
+            </h1>
+          </div>
+          
+          <div className="prose prose-invert max-w-none">
+            <textarea
+              value={content}
+              onChange={(e) => handleContentChange(e.target.value)}
+              placeholder="|Write, press 'space' for AI, '/' for commands..."
+              className="w-full h-full resize-none border-none outline-none text-base leading-relaxed bg-transparent p-0 text-left"
+              style={{ minHeight: 'calc(100vh - 300px)' }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Footer with document info */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs sm:text-sm text-muted-foreground border-t pt-3 sm:pt-4 gap-2 sm:gap-0">
-        <div>
-          Last saved: {document.updated_at ? new Date(document.updated_at).toLocaleString() : 'Never'}
-        </div>
-        <div>
-          Document ID: {document.id.substring(0, 8)}...
+      <div className="border-t px-6 py-3">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div>
+            Last saved: {document.updated_at ? new Date(document.updated_at).toLocaleString() : 'Never'}
+          </div>
+          <div>
+            Document ID: {document.id.substring(0, 8)}...
+          </div>
         </div>
       </div>
     </div>
