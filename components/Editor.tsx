@@ -53,6 +53,7 @@ export default function Editor() {
   const isSavingContentRef = useRef(false);
   const blockRefs = useRef<{ [key: string]: HTMLTextAreaElement }>({});
   const commandPaletteRef = useRef<HTMLDivElement>(null);
+  const resizeTimeoutsRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
   // Advanced commands with previews
   const commands: CommandItem[] = [
@@ -333,6 +334,15 @@ export default function Editor() {
     }
   }, [document?.id]);
 
+  // Cleanup resize timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(resizeTimeoutsRef.current).forEach(timeout => {
+        clearTimeout(timeout);
+      });
+    };
+  }, []);
+
   // Auto-save title changes
   const handleTitleChange = useCallback(async (newTitle: string) => {
     setTitle(newTitle);
@@ -530,18 +540,36 @@ export default function Editor() {
   const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement) => {
     // Reset height to auto first to get accurate scrollHeight
     textarea.style.height = 'auto';
-    textarea.style.minHeight = 'auto';
     
-    // Set height to scrollHeight for proper content display
-    const newHeight = Math.max(textarea.scrollHeight, 24); // Minimum height of 24px
+    // Get the exact content height without any padding calculations
+    const contentHeight = textarea.scrollHeight;
+    
+    // Set height to exact content height with no minimum padding
+    const newHeight = Math.max(contentHeight, 0);
     textarea.style.height = `${newHeight}px`;
+    textarea.style.minHeight = `${newHeight}px`;
+    textarea.style.maxHeight = `${newHeight}px`;
     
-    // Ensure the container also adjusts
+    // Ensure the container also adjusts smoothly
     const container = textarea.closest('.block-container') as HTMLElement;
     if (container) {
       container.style.height = 'auto';
     }
   }, []);
+
+  // Debounced resize function for better performance
+  const debouncedResize = useCallback((textarea: HTMLTextAreaElement) => {
+    const blockId = textarea.dataset.blockId;
+    if (blockId && resizeTimeoutsRef.current[blockId]) {
+      clearTimeout(resizeTimeoutsRef.current[blockId]);
+    }
+    
+    if (blockId) {
+      resizeTimeoutsRef.current[blockId] = setTimeout(() => {
+        autoResizeTextarea(textarea);
+      }, 10);
+    }
+  }, [autoResizeTextarea]);
 
   // Handle block key events
   const handleBlockKeyDown = useCallback((e: React.KeyboardEvent, blockId: string) => {
@@ -630,8 +658,12 @@ export default function Editor() {
       ref: (el: HTMLTextAreaElement) => {
         if (el) {
           blockRefs.current[block.id] = el;
-          // Auto-resize on initial render
-          setTimeout(() => autoResizeTextarea(el), 0);
+          el.dataset.blockId = block.id;
+          // Auto-resize on initial render with no minimum height
+          setTimeout(() => {
+            autoResizeTextarea(el);
+            // No minimum height - let it be exactly the content height
+          }, 0);
         }
       },
       value: block.content,
@@ -639,21 +671,23 @@ export default function Editor() {
         const newContent = e.target.value;
         handleBlockChange(block.id, newContent);
         handleSlashCommand(block.id, newContent);
-        // Auto-resize the textarea
-        autoResizeTextarea(e.target);
+        // Use debounced resize for better performance
+        debouncedResize(e.target);
       },
       onKeyDown: (e: React.KeyboardEvent) => handleBlockKeyDown(e, block.id),
       placeholder: `Type '/' for commands...`,
-      className: "w-full resize-none border-none outline-none bg-transparent text-white editor-textarea",
+      className: "w-full resize-none border-none outline-none bg-transparent text-white editor-textarea focus:outline-none focus:ring-0 transition-all duration-100",
       style: {
         fontSize: '16px',
-        lineHeight: '1.6',
+        lineHeight: '1.4',
         padding: '0',
         margin: '0',
         caretColor: 'white',
         caretShape: 'block' as const,
         height: 'auto',
-        minHeight: 'auto'
+        minHeight: '0',
+        maxHeight: 'none',
+        overflow: 'hidden'
       },
       spellCheck: false,
       autoComplete: "off",
@@ -688,8 +722,8 @@ export default function Editor() {
         );
       case 'bulleted-list':
         return (
-          <div className="flex items-start">
-            <span className="text-blue-400 mr-3 mt-3 text-lg">•</span>
+          <div className="flex items-start gap-2 group/list-item">
+            <span className="text-blue-400 text-lg mt-1 flex-shrink-0 w-4 text-center group-hover/list-item:text-blue-300 transition-colors">•</span>
             <textarea
               {...commonProps}
               style={{ ...commonProps.style, flex: 1, caretShape: 'block' as const }}
@@ -699,8 +733,8 @@ export default function Editor() {
         );
       case 'numbered-list':
         return (
-          <div className="flex items-start">
-            <span className="text-blue-400 mr-3 mt-3 min-w-[20px] text-lg">
+          <div className="flex items-start gap-2 group/list-item">
+            <span className="text-blue-400 text-lg flex-shrink-0 w-6 text-right group-hover/list-item:text-blue-300 transition-colors">
               {block.listIndex || 1}.
             </span>
             <textarea
@@ -712,8 +746,8 @@ export default function Editor() {
         );
       case 'todo-list':
         return (
-          <div className="flex items-start">
-            <input type="checkbox" className="mr-3 mt-3" />
+          <div className="flex items-start gap-2 group/list-item">
+            <input type="checkbox" className="mt-1 flex-shrink-0 w-4 h-4 text-blue-500 rounded border-gray-600 bg-gray-800 focus:ring-blue-500 focus:ring-2" />
             <textarea
               {...commonProps}
               style={{ ...commonProps.style, flex: 1, caretShape: 'block' as const }}
@@ -723,7 +757,7 @@ export default function Editor() {
         );
       case 'quote':
         return (
-          <div className="border-l-4 border-gray-600 pl-4">
+          <div className="border-l-4 border-gray-600 pl-3">
             <textarea
               {...commonProps}
               style={{ ...commonProps.style, fontStyle: 'italic', caretShape: 'block' as const }}
@@ -733,7 +767,7 @@ export default function Editor() {
         );
       case 'code-block':
         return (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
             <textarea
               {...commonProps}
               style={{ ...commonProps.style, fontFamily: 'monospace', color: '#10b981', caretShape: 'block' as const }}
@@ -743,7 +777,7 @@ export default function Editor() {
         );
       case 'divider':
         return (
-          <div className="border-t border-gray-600 my-4"></div>
+          <div className="border-t border-gray-600 my-2"></div>
         );
       case 'table':
         return (
@@ -757,8 +791,8 @@ export default function Editor() {
         );
       case 'image':
         return (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
-            <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-center">
+            <Image className="h-6 w-6 mx-auto text-gray-400 mb-1" />
             <textarea
               {...commonProps}
               style={{ ...commonProps.style, textAlign: 'center', caretShape: 'block' as const }}
@@ -768,8 +802,8 @@ export default function Editor() {
         );
       case 'video':
         return (
-          <div className="bg-gray-700 rounded-lg p-4 text-center">
-            <Video className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+          <div className="bg-gray-700 rounded-lg p-3 text-center">
+            <Video className="h-6 w-6 mx-auto text-gray-400 mb-1" />
             <textarea
               {...commonProps}
               style={{ ...commonProps.style, textAlign: 'center', caretShape: 'block' as const }}
@@ -923,18 +957,18 @@ export default function Editor() {
 
       {/* Content editor */}
       <div className="flex-1 px-6 lg:px-8 overflow-y-auto">
-        <div className="max-w-4xl mx-auto py-8">
+        <div className="max-w-4xl mx-auto py-6">
           {/* Document title */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-4 text-white">
+          <div className="text-center mb-6">
+            <h1 className="text-4xl font-bold mb-3 text-white">
               {title || 'Untitled Document'}
             </h1>
           </div>
           
           {/* Blocks */}
-          <div className="space-y-4">
+          <div className="space-y-1">
             {blocks.map((block, index) => (
-              <div key={block.id} className="block-container relative group" data-type={block.type}>
+              <div key={block.id} className="block-container relative group py-0.5" data-type={block.type}>
                 {renderBlock(block)}
                 
                 {/* Delete button - visible on hover */}
@@ -961,7 +995,7 @@ export default function Editor() {
           </div>
           
           {/* Add new block button */}
-          <div className="mt-8 text-center">
+          <div className="mt-6 text-center">
             <Button
               variant="ghost"
               onClick={() => addBlock(blocks[blocks.length - 1]?.id || '')}

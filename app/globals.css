@@ -99,6 +99,33 @@
     }
   }
   
+  /* Editor-specific styles for auto-height behavior */
+  .editor-textarea {
+    transition: height 0.1s ease-out;
+    box-sizing: border-box;
+  }
+  
+  .block-container {
+    transition: all 0.1s ease-out;
+  }
+  
+  /* Ensure proper spacing for different block types */
+  .block-container[data-type="heading-1"] .editor-textarea {
+    line-height: 1.2;
+  }
+  
+  .block-container[data-type="heading-2"] .editor-textarea {
+    line-height: 1.3;
+  }
+  
+  .block-container[data-type="heading-3"] .editor-textarea {
+    line-height: 1.4;
+  }
+  
+  .block-container[data-type="text"] .editor-textarea {
+    line-height: 1.5;
+  }
+  
   /* Editor-specific styles */
   .editor-textarea {
     caret-color: white !important;
@@ -176,16 +203,16 @@
   /* Notion-style textarea */
   .editor-textarea {
     font-size: 16px !important;
-    line-height: 1.6 !important;
+    line-height: 1.4 !important;
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
     resize: none !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     background: transparent !important;
     color: white !important;
     font-weight: normal !important;
-    min-height: auto !important;
+    min-height: 0 !important;
     height: auto !important;
   }
   
@@ -217,6 +244,8 @@
     box-sizing: border-box !important;
     word-wrap: break-word !important;
     white-space: pre-wrap !important;
+    height: fit-content !important;
+    min-height: fit-content !important;
   }
   
   /* Smooth transitions */
@@ -224,12 +253,47 @@
     transition: all 0.1s ease-in-out;
   }
   
+  /* Remove any bottom spacing */
+  .editor-textarea {
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+    line-height: 1.4 !important;
+  }
+  
+  /* Force exact height matching */
+  .editor-textarea {
+    height: fit-content !important;
+    min-height: fit-content !important;
+    max-height: fit-content !important;
+    overflow: hidden !important;
+  }
+  
+  /* Remove any extra line spacing */
+  .editor-textarea {
+    line-height: 1.4 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    outline: none !important;
+  }
+  
+  /* Override any browser defaults that add extra space */
+  .editor-textarea {
+    display: block !important;
+    box-sizing: border-box !important;
+    vertical-align: top !important;
+    resize: none !important;
+    font-family: inherit !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+  }
+  
   /* Block editor specific styles */
   .block-container {
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     position: relative;
     height: auto !important;
-    min-height: auto !important;
+    min-height: 0 !important;
     max-height: none !important;
   }
   
