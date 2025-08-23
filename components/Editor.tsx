@@ -15,6 +15,8 @@ interface Block {
   type: string;
   content: string;
   metadata?: any;
+  listIndex?: number; // For numbered lists
+  parentListId?: string; // For nested lists
 }
 
 interface CommandItem {
@@ -422,16 +424,33 @@ export default function Editor() {
   const handleCommandSelect = useCallback(async (command: CommandItem) => {
     if (!activeBlockId) return;
     
-    const result = command.action(blocks.find(b => b.id === activeBlockId)?.content || '');
+    const currentBlock = blocks.find(b => b.id === activeBlockId);
+    if (!currentBlock) return;
     
-    setBlocks(prev => prev.map(block => 
-      block.id === activeBlockId 
-        ? { ...block, content: result.newContent, type: command.id }
-        : block
-    ));
+    // Get the content without the slash command
+    const contentWithoutSlash = currentBlock.content.replace(/^\/\S*\s*/, '');
+    
+    // Apply the command action to the cleaned content
+    const result = command.action(contentWithoutSlash);
+    
+    setBlocks(prev => {
+      const updatedBlocks = prev.map(block => 
+        block.id === activeBlockId 
+          ? { ...block, content: result.newContent, type: command.id }
+          : block
+      );
+      
+      // Update list indices if the new type is a list
+      if (command.id === 'numbered-list' || command.id === 'bulleted-list' || command.id === 'todo-list') {
+        return updateListIndices(updatedBlocks);
+      }
+      
+      return updatedBlocks;
+    });
     
     setShowCommands(false);
     setActiveBlockId(null);
+    setCommandFilter("");
     setContentChanged(true);
     
     // Focus the block after type change
@@ -470,6 +489,19 @@ export default function Editor() {
     }
   }, [filteredCommands, selectedCommandIndex, handleCommandSelect]);
 
+  // Update list indices for numbered lists
+  const updateListIndices = useCallback((blocks: Block[]) => {
+    let currentListIndex = 1;
+    return blocks.map(block => {
+      if (block.type === 'numbered-list') {
+        const updatedBlock = { ...block, listIndex: currentListIndex };
+        currentListIndex++;
+        return updatedBlock;
+      }
+      return block;
+    });
+  }, []);
+
   // Add new block
   const addBlock = useCallback((afterBlockId: string) => {
     const newBlock: Block = { id: `block-${Date.now()}`, type: 'text', content: '' };
@@ -477,7 +509,9 @@ export default function Editor() {
       const index = prev.findIndex(b => b.id === afterBlockId);
       const newBlocks = [...prev];
       newBlocks.splice(index + 1, 0, newBlock);
-      return newBlocks;
+      
+      // Update list indices if needed
+      return updateListIndices(newBlocks);
     });
     
     // Focus new block
@@ -487,15 +521,26 @@ export default function Editor() {
         blockElement.focus();
       }
     }, 10);
-  }, []);
+  }, [updateListIndices]);
 
   // Track last Enter press time for double-Enter detection
   const lastEnterPressRef = useRef<{ [key: string]: number }>({});
 
   // Auto-resize textarea height based on content
   const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement) => {
+    // Reset height to auto first to get accurate scrollHeight
     textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
+    textarea.style.minHeight = 'auto';
+    
+    // Set height to scrollHeight for proper content display
+    const newHeight = Math.max(textarea.scrollHeight, 24); // Minimum height of 24px
+    textarea.style.height = `${newHeight}px`;
+    
+    // Ensure the container also adjusts
+    const container = textarea.closest('.block-container') as HTMLElement;
+    if (container) {
+      container.style.height = 'auto';
+    }
   }, []);
 
   // Handle block key events
@@ -503,37 +548,71 @@ export default function Editor() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       
+      const currentBlock = blocks.find(b => b.id === blockId);
+      if (!currentBlock) return;
+      
       const now = Date.now();
       const lastPress = lastEnterPressRef.current[blockId] || 0;
       const timeDiff = now - lastPress;
       
-      // Only create new block if Enter is pressed twice within 500ms
-      if (timeDiff < 500) {
-        addBlock(blockId);
-        // Reset the timer after creating block
-        lastEnterPressRef.current[blockId] = 0;
-      } else {
-        // Update the last press time and insert newline
-        lastEnterPressRef.current[blockId] = now;
-        
-        // Insert newline at cursor position
-        const textarea = blockRefs.current[blockId];
-        if (textarea) {
-          const cursorPos = textarea.selectionStart;
-          const content = blocks.find(b => b.id === blockId)?.content || '';
-          const newContent = content.slice(0, cursorPos) + '\n' + content.slice(cursorPos);
+      // Handle list-specific Enter behavior
+      if (currentBlock.type === 'numbered-list' || currentBlock.type === 'bulleted-list' || currentBlock.type === 'todo-list') {
+        if (currentBlock.content.trim() === '') {
+          // Empty list item - exit list and create new block
+          addBlock(blockId);
+          lastEnterPressRef.current[blockId] = 0;
+        } else {
+          // Non-empty list item - continue list
+          const newBlock: Block = { 
+            id: `block-${Date.now()}`, 
+            type: currentBlock.type, 
+            content: '',
+            listIndex: currentBlock.type === 'numbered-list' ? (currentBlock.listIndex || 1) + 1 : undefined
+          };
           
-          // Update the block content
-          setBlocks(prev => prev.map(b => 
-            b.id === blockId ? { ...b, content: newContent } : b
-          ));
+          setBlocks(prev => {
+            const index = prev.findIndex(b => b.id === blockId);
+            const newBlocks = [...prev];
+            newBlocks.splice(index + 1, 0, newBlock);
+            return updateListIndices(newBlocks);
+          });
           
-          // Set cursor position after newline and auto-resize
+          // Focus new list item
           setTimeout(() => {
-            textarea.setSelectionRange(cursorPos + 1, cursorPos + 1);
-            textarea.focus();
-            autoResizeTextarea(textarea);
-          }, 0);
+            const blockElement = blockRefs.current[newBlock.id];
+            if (blockElement) {
+              blockElement.focus();
+            }
+          }, 10);
+        }
+      } else {
+        // Non-list blocks - use double-Enter logic
+        if (timeDiff < 500) {
+          addBlock(blockId);
+          lastEnterPressRef.current[blockId] = 0;
+        } else {
+          // Update the last press time and insert newline
+          lastEnterPressRef.current[blockId] = now;
+          
+          // Insert newline at cursor position
+          const textarea = blockRefs.current[blockId];
+          if (textarea) {
+            const cursorPos = textarea.selectionStart;
+            const content = currentBlock.content;
+            const newContent = content.slice(0, cursorPos) + '\n' + content.slice(cursorPos);
+            
+            // Update the block content
+            setBlocks(prev => prev.map(b => 
+              b.id === blockId ? { ...b, content: newContent } : b
+            ));
+            
+            // Set cursor position after newline and auto-resize
+            setTimeout(() => {
+              textarea.setSelectionRange(cursorPos + 1, cursorPos + 1);
+              textarea.focus();
+              autoResizeTextarea(textarea);
+            }, 0);
+          }
         }
       }
     } else if (e.key === 'Backspace') {
@@ -572,7 +651,9 @@ export default function Editor() {
         padding: '0',
         margin: '0',
         caretColor: 'white',
-        caretShape: 'block' as const
+        caretShape: 'block' as const,
+        height: 'auto',
+        minHeight: 'auto'
       },
       spellCheck: false,
       autoComplete: "off",
@@ -619,7 +700,9 @@ export default function Editor() {
       case 'numbered-list':
         return (
           <div className="flex items-start">
-            <span className="text-blue-400 mr-3 mt-3 min-w-[20px] text-lg">1.</span>
+            <span className="text-blue-400 mr-3 mt-3 min-w-[20px] text-lg">
+              {block.listIndex || 1}.
+            </span>
             <textarea
               {...commonProps}
               style={{ ...commonProps.style, flex: 1, caretShape: 'block' as const }}
@@ -851,8 +934,28 @@ export default function Editor() {
           {/* Blocks */}
           <div className="space-y-4">
             {blocks.map((block, index) => (
-              <div key={block.id} className="block-container" data-type={block.type}>
+              <div key={block.id} className="block-container relative group" data-type={block.type}>
                 {renderBlock(block)}
+                
+                {/* Delete button - visible on hover */}
+                <button
+                  onClick={() => {
+                    if (blocks.length > 1) {
+                      setBlocks(prev => {
+                        const filteredBlocks = prev.filter(b => b.id !== block.id);
+                        return updateListIndices(filteredBlocks);
+                      });
+                      toast.success("Block deleted");
+                    } else {
+                      toast.error("Cannot delete the last block");
+                    }
+                  }}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1.5 rounded-md hover:bg-red-500/20 text-red-400 hover:text-red-300"
+                  title="Delete block"
+                  disabled={blocks.length <= 1}
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             ))}
           </div>

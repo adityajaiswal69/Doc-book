@@ -181,10 +181,12 @@
     margin: 0 !important;
     border: none !important;
     resize: none !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     background: transparent !important;
     color: white !important;
     font-weight: normal !important;
+    min-height: auto !important;
+    height: auto !important;
   }
   
   /* Hide scrollbars but keep functionality */
@@ -210,6 +212,13 @@
     box-shadow: none !important;
   }
   
+  /* Ensure textarea expands properly */
+  .editor-textarea {
+    box-sizing: border-box !important;
+    word-wrap: break-word !important;
+    white-space: pre-wrap !important;
+  }
+  
   /* Smooth transitions */
   .editor-textarea {
     transition: all 0.1s ease-in-out;
@@ -219,6 +228,9 @@
   .block-container {
     margin-bottom: 1rem;
     position: relative;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
   }
   
   .block-container:focus-within {
