@@ -1,12 +1,5 @@
 "use client";
 
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  UserButton,
-  useUser,
-} from "@clerk/nextjs";
 import { SidebarTrigger } from "./ui/sidebar";
 import {
   Popover,
@@ -18,14 +11,13 @@ import { Check } from "lucide-react";
 import { Button } from "./ui/button";
 import { FormEvent, useEffect, useState, useTransition } from "react";
 import { useDocument } from "@/hooks/use-documents";
-import { supabase } from "@/lib/supabase";
+import { updateDocument } from "@/actions/actions";
 import { ThemeToggle } from "./theme-toggle";
 
 function Header({ id }: { id: string }) {
   const [input, setInput] = useState("");
   const [isUpdating, startTransition] = useTransition();
   const { document, loading, error } = useDocument(id);
-  const { user } = useUser();
 
   useEffect(() => {
     if (document) {
@@ -37,16 +29,10 @@ function Header({ id }: { id: string }) {
     e.preventDefault();
     if (input.trim() && document) {
       startTransition(async () => {
-        const { error: updateError } = await supabase
-          .from('documents')
-          .update({ 
-            title: input,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', id);
-
-        if (updateError) {
-          console.error('Error updating title:', updateError);
+        try {
+          await updateDocument(id, { title: input });
+        } catch (error) {
+          console.error('Error updating title:', error);
         }
       });
     }
@@ -61,14 +47,6 @@ function Header({ id }: { id: string }) {
         </div>
         <div className="flex items-center gap-x-3">
           <ThemeToggle />
-          <div>
-            <SignedOut>
-              <SignInButton />
-            </SignedOut>
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
-          </div>
         </div>
       </div>
     );
@@ -83,14 +61,6 @@ function Header({ id }: { id: string }) {
         </div>
         <div className="flex items-center gap-x-3">
           <ThemeToggle />
-          <div>
-            <SignedOut>
-              <SignInButton />
-            </SignedOut>
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
-          </div>
         </div>
       </div>
     );
@@ -126,14 +96,6 @@ function Header({ id }: { id: string }) {
       </div>
       <div className="flex items-center gap-x-3">
         <ThemeToggle />
-        <div>
-          <SignedOut>
-            <SignInButton />
-          </SignedOut>
-          <SignedIn>
-            <UserButton />
-          </SignedIn>
-        </div>
       </div>
     </div>
   );

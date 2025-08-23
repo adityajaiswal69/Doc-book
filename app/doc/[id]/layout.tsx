@@ -1,7 +1,5 @@
 import Header from "@/components/Header";
 import { RoomProvider } from "@/components/RoomProvider";
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
 import { use } from "react";
 
 export default function Layout({children, params}:{
@@ -9,17 +7,16 @@ export default function Layout({children, params}:{
     params: Promise<{ id: string }>
     
 }) {
-    const  userId  = auth();
     const { id } = use(params);
-
-    if (!userId) {
-        redirect('/');
-    }
   
     return (
       <RoomProvider roomId={id}>
+        <div className="flex flex-col h-full">
           <Header id={id}/>
-          {children}
+          <div className="flex-1 overflow-y-auto">
+            {children}
+          </div>
+        </div>
       </RoomProvider>
     )
 }

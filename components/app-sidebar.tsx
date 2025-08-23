@@ -1,148 +1,239 @@
 "use client";
-import { Calendar, Home, Inbox, Search, Settings } from "lucide-react";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import { useUser } from "@clerk/nextjs";
-import NewDocumentButton from "./NewDocumentButton";
-import { useEffect, useState } from "react";
-import SidebarOption from "./SidebarOption";
+
 import { useDocuments } from "@/hooks/use-documents";
-import { Document, UserRoom } from "@/types/database";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { 
+  FileText, 
+  Search, 
+  Plus, 
+  Settings, 
+  LogOut, 
+  User,
+  Database,
+  Loader2
+} from "lucide-react";
+import { testDatabaseConnection } from "@/actions/actions";
+import { useState } from "react";
 
-// Menu items.
-const items = [
-  {
-    title: "Home",
-    url: "#",
-    icon: Home,
-  },
-  {
-    title: "Inbox",
-    url: "#",
-    icon: Inbox,
-  },
-  {
-    title: "Calendar",
-    url: "#",
-    icon: Calendar,
-  },
-  {
-    title: "Search",
-    url: "#",
-    icon: Search,
-  },
-  {
-    title: "Settings",
-    url: "#",
-    icon: Settings,
-  },
-];
+export default function AppSidebar() {
+  const { user, signOut } = useAuth();
+  const { documents, userRooms, loading, error, refetch } = useDocuments();
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
 
-export function AppSidebar() {
-  const { user } = useUser();
-  const { documents, userRooms, loading, error } = useDocuments();
-  const [groupedData, setGroupedData] = useState<{
-    owner: (Document & { roomId: string })[];
-    editor: (Document & { roomId: string })[];
-  }>({
-    owner: [],
-    editor: [],
-  });
+  const handleTestConnection = async () => {
+    if (!user?.id) return;
+    
+    setTesting(true);
+    try {
+      const result = await testDatabaseConnection(user.id);
+      setTestResult(result);
+    } catch (error) {
+      setTestResult({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } finally {
+      setTesting(false);
+    }
+  };
 
-  useEffect(() => {
-    if (!documents || !userRooms) return;
+  const filteredDocuments = documents.filter(doc =>
+    doc.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-    const grouped = documents.reduce<{
-      owner: (Document & { roomId: string })[];
-      editor: (Document & { roomId: string })[];
-    }>(
-      (acc, document) => {
-        const userRoom = userRooms.find(ur => ur.room_id === document.id);
-        
-        if (userRoom) {
-          const docWithRoomId = { ...document, roomId: document.id };
-          
-          if (userRoom.role === "owner") {
-            acc.owner.push(docWithRoomId);
-          } else {
-            acc.editor.push(docWithRoomId);
-          }
-        }
-        return acc;
-      },
-      {
-        owner: [],
-        editor: [],
-      }
-    );
+  const handleCreateDocument = async () => {
+    if (!user?.id) {
+      alert('Please sign in to create a document');
+      return;
+    }
 
-    setGroupedData(grouped);
-  }, [documents, userRooms]);
-
-  if (error) {
-    console.error("Error loading documents:", error);
-  }
+    try {
+      const { createDocument } = await import('@/actions/actions');
+      const result = await createDocument(user.id);
+      router.push(`/doc/${result.docId}`);
+    } catch (error) {
+      console.error('Failed to create document:', error);
+      alert('Failed to create document. Please try again.');
+    }
+  };
 
   return (
-    <Sidebar>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className="mb-2 flex items-center justify-between">
-            {user && (
-              <h1 className="text-xl font-bold">
-                {user?.firstName}
-                {`'s`} Forge
-              </h1>
-            )}
-            <NewDocumentButton />
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+    <div className="w-80 bg-background border-r flex flex-col h-full">
+      {/* Header */}
+      <div className="p-4 border-b">
+        <div className="flex items-center gap-2 mb-4">
+          <FileText className="h-6 w-6 text-primary" />
+          <h1 className="text-xl font-bold">Note Forge</h1>
+        </div>
+        
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search documents..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {loading ? (
-                <div className="p-2 text-sm text-muted-foreground">Loading...</div>
-              ) : groupedData.owner.length === 0 ? (
-                <div className="p-2 text-sm text-muted-foreground">No documents found</div>
-              ) : (
-                <>
-                  {groupedData.owner.map((doc) => (
-                    <SidebarOption
-                      key={doc.id}
-                      href={`/doc/${doc.roomId}`}
-                      id={doc.roomId}
-                    />
-                  ))}
-                </>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Create Document Button */}
+        <Button 
+          onClick={handleCreateDocument}
+          className="w-full"
+          disabled={!user}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New Document
+        </Button>
+
+        {/* Documents List */}
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-muted-foreground">Documents</h3>
+          
+          {loading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          ) : error ? (
+            <Card className="border-red-200 bg-red-50 dark:bg-red-950/20">
+              <CardContent className="pt-4">
+                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={refetch}
+                  className="mt-2"
+                >
+                  Retry
+                </Button>
+              </CardContent>
+            </Card>
+          ) : filteredDocuments.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">
+                {searchQuery ? 'No documents found' : 'No documents yet'}
+              </p>
+              {!searchQuery && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleCreateDocument}
+                  className="mt-2"
+                >
+                  Create your first document
+                </Button>
               )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {filteredDocuments.map((doc) => (
+                <Button
+                  key={doc.id}
+                  variant="ghost"
+                  className="w-full justify-start text-left h-auto p-3"
+                  onClick={() => router.push(`/doc/${doc.id}`)}
+                >
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium truncate w-full">
+                      {doc.title || 'Untitled Document'}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {doc.updated_at 
+                        ? new Date(doc.updated_at).toLocaleDateString()
+                        : 'Never updated'
+                      }
+                    </span>
+                  </div>
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Debug Info */}
+        <Separator />
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-muted-foreground">Debug Info</h3>
+          <div className="text-xs space-y-1">
+            <div>Documents: {documents.length}</div>
+            <div>User Rooms: {userRooms.length}</div>
+            <div>User ID: {user?.id ? user.id.substring(0, 8) + '...' : 'None'}</div>
+          </div>
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleTestConnection}
+            disabled={testing || !user}
+            className="w-full"
+          >
+            {testing ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                Testing...
+              </>
+            ) : (
+              <>
+                <Database className="h-3 w-3 mr-1" />
+                Test DB Connection
+              </>
+            )}
+          </Button>
+
+          {testResult && (
+            <Card className="mt-2">
+              <CardContent className="pt-3">
+                <pre className="text-xs overflow-auto">
+                  {JSON.stringify(testResult, null, 2)}
+                </pre>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="p-4 border-t">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+            <User className="h-4 w-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">
+              {user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {user?.email || 'No email'}
+            </p>
+          </div>
+        </div>
+        
+        <div className="space-y-1">
+          <Button variant="ghost" size="sm" className="w-full justify-start">
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="w-full justify-start text-red-600 hover:text-red-700"
+            onClick={signOut}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Sign Out
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
