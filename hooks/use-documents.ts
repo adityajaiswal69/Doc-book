@@ -56,16 +56,8 @@ export function useDocuments() {
 
     fetchDocuments()
 
-    // Set up polling for real-time updates (like Notion)
-    const interval = setInterval(() => {
-      console.log('Polling for document updates...')
-      fetchDocuments()
-    }, 3000) // Poll every 3 seconds for real-time feel
-
-    return () => {
-      console.log('Cleaning up useDocuments effect')
-      clearInterval(interval)
-    }
+    // Only fetch on mount and when user/session changes
+    // Removed aggressive polling to prevent interference with editing
   }, [user?.id, authLoading, session, fetchDocuments])
 
   return { documents, userRooms, loading, error, refetch: fetchDocuments }
@@ -77,6 +69,7 @@ export function useDocument(id: string) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [lastSavedDocument, setLastSavedDocument] = useState<Document | null>(null)
 
   const fetchDocument = useCallback(async () => {
     if (!id || !user?.id) {
@@ -93,7 +86,15 @@ export function useDocument(id: string) {
       const result = await getDocument(id, user.id)
       
       console.log('Document fetched successfully:', result.document)
-      setDocument(result.document)
+      
+      // Only update if the document has actually changed
+      if (!lastSavedDocument || 
+          lastSavedDocument.title !== result.document.title ||
+          lastSavedDocument.content !== result.document.content ||
+          lastSavedDocument.updated_at !== result.document.updated_at) {
+        setDocument(result.document)
+        setLastSavedDocument(result.document)
+      }
     } catch (err) {
       console.error('Error in fetchDocument:', err)
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -101,7 +102,7 @@ export function useDocument(id: string) {
     } finally {
       setLoading(false)
     }
-  }, [id, user?.id])
+  }, [id, user?.id, lastSavedDocument])
 
   const saveDocument = useCallback(async (updates: { title?: string; content?: string }) => {
     if (!id || !user?.id) return
@@ -110,7 +111,19 @@ export function useDocument(id: string) {
       setSaving(true)
       const { updateDocument } = await import('@/actions/actions')
       const result = await updateDocument(id, updates, user.id)
-      setDocument(result.document)
+      
+      // Update the last saved document reference
+      setLastSavedDocument(result.document)
+      
+      // Only update the document state if it's significantly different
+      // This prevents unnecessary re-renders during typing
+      if (!document || 
+          document.title !== result.document.title ||
+          document.content !== result.document.content ||
+          document.updated_at !== result.document.updated_at) {
+        setDocument(result.document)
+      }
+      
       console.log('Document saved successfully')
     } catch (err) {
       console.error('Error saving document:', err)
@@ -118,21 +131,13 @@ export function useDocument(id: string) {
     } finally {
       setSaving(false)
     }
-  }, [id, user?.id])
+  }, [id, user?.id, document])
 
   useEffect(() => {
     fetchDocument()
 
-    // Set up polling for real-time updates
-    const interval = setInterval(() => {
-      console.log('Polling for document updates:', id)
-      fetchDocument()
-    }, 2000) // Poll every 2 seconds for real-time feel
-
-    return () => {
-      console.log('Cleaning up useDocument effect for:', id)
-      clearInterval(interval)
-    }
+    // Only fetch on mount and when document ID changes
+    // Removed aggressive polling to prevent interference with editing
   }, [id, fetchDocument])
 
   return { document, loading, error, saving, saveDocument, refetch: fetchDocument }

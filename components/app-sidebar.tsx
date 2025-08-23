@@ -5,8 +5,6 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { 
   FileText, 
   Search, 
@@ -14,33 +12,21 @@ import {
   Settings, 
   LogOut, 
   User,
-  Database,
-  Loader2
+  Trash2,
+  Menu,
+  X
 } from "lucide-react";
-import { testDatabaseConnection } from "@/actions/actions";
 import { useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { toast } from "sonner";
 
 export default function AppSidebar() {
   const { user, signOut } = useAuth();
-  const { documents, userRooms, loading, error, refetch } = useDocuments();
+  const { documents, loading, error, refetch } = useDocuments();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<any>(null);
-
-  const handleTestConnection = async () => {
-    if (!user?.id) return;
-    
-    setTesting(true);
-    try {
-      const result = await testDatabaseConnection(user.id);
-      setTestResult(result);
-    } catch (error) {
-      setTestResult({ error: error instanceof Error ? error.message : 'Unknown error' });
-    } finally {
-      setTesting(false);
-    }
-  };
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const filteredDocuments = documents.filter(doc =>
     doc.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -48,7 +34,7 @@ export default function AppSidebar() {
 
   const handleCreateDocument = async () => {
     if (!user?.id) {
-      alert('Please sign in to create a document');
+      toast.error('Please sign in to create a document');
       return;
     }
 
@@ -56,14 +42,43 @@ export default function AppSidebar() {
       const { createDocument } = await import('@/actions/actions');
       const result = await createDocument(user.id);
       router.push(`/doc/${result.docId}`);
+      toast.success('Document created successfully');
+      // Close mobile sidebar after creating document
+      if (isMobile) {
+        setIsMobileOpen(false);
+      }
     } catch (error) {
       console.error('Failed to create document:', error);
-      alert('Failed to create document. Please try again.');
+      toast.error('Failed to create document. Please try again.');
     }
   };
 
-  return (
-    <div className="w-80 bg-background border-r flex flex-col h-full">
+  const handleDocumentClick = (docId: string) => {
+    router.push(`/doc/${docId}`);
+    // Close mobile sidebar after clicking document
+    if (isMobile) {
+      setIsMobileOpen(false);
+    }
+  };
+
+  const handleDeleteDocument = async (docId: string, docTitle: string) => {
+    if (!user?.id) return;
+    
+    const confirmDelete = confirm(`Are you sure you want to delete "${docTitle}"? This action cannot be undone.`);
+    if (!confirmDelete) return;
+    
+    try {
+      const { deleteDocument } = await import('@/actions/actions');
+      await deleteDocument(docId, user.id);
+      toast.success('Document deleted successfully');
+      refetch(); // Refresh the documents list
+    } catch (error) {
+      toast.error(`Failed to delete document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const sidebarContent = (
+    <div className="bg-background border-r flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center gap-2 mb-4">
@@ -101,11 +116,11 @@ export default function AppSidebar() {
           
           {loading ? (
             <div className="flex items-center justify-center py-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
             </div>
           ) : error ? (
-            <Card className="border-red-200 bg-red-50 dark:bg-red-950/20">
-              <CardContent className="pt-4">
+            <div className="border-red-200 bg-red-50 dark:bg-red-950/20">
+              <div className="pt-4">
                 <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
                 <Button 
                   variant="outline" 
@@ -115,8 +130,8 @@ export default function AppSidebar() {
                 >
                   Retry
                 </Button>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ) : filteredDocuments.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
@@ -137,103 +152,103 @@ export default function AppSidebar() {
           ) : (
             <div className="space-y-1">
               {filteredDocuments.map((doc) => (
-                <Button
-                  key={doc.id}
-                  variant="ghost"
-                  className="w-full justify-start text-left h-auto p-3"
-                  onClick={() => router.push(`/doc/${doc.id}`)}
-                >
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium truncate w-full">
-                      {doc.title || 'Untitled Document'}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {doc.updated_at 
-                        ? new Date(doc.updated_at).toLocaleDateString()
-                        : 'Never updated'
-                      }
-                    </span>
-                  </div>
-                </Button>
+                <div key={doc.id} className="group relative">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-left h-auto p-3 pr-12"
+                    onClick={() => handleDocumentClick(doc.id)}
+                  >
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium truncate w-full">
+                        {doc.title || 'Untitled Document'}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {doc.updated_at 
+                          ? new Date(doc.updated_at).toLocaleDateString()
+                          : 'Never updated'
+                        }
+                      </span>
+                    </div>
+                  </Button>
+                  
+                  {/* Delete button - appears on hover */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteDocument(doc.id, doc.title || 'Untitled Document');
+                    }}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Debug Info */}
-        <Separator />
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium text-muted-foreground">Debug Info</h3>
-          <div className="text-xs space-y-1">
-            <div>Documents: {documents.length}</div>
-            <div>User Rooms: {userRooms.length}</div>
-            <div>User ID: {user?.id ? user.id.substring(0, 8) + '...' : 'None'}</div>
+        {/* User Profile */}
+        <div className="pt-4 border-t">
+          <div className="flex items-center gap-2 mb-2">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">{user?.user_metadata?.full_name || 'User'}</span>
           </div>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleTestConnection}
-            disabled={testing || !user}
-            className="w-full"
-          >
-            {testing ? (
-              <>
-                <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                Testing...
-              </>
-            ) : (
-              <>
-                <Database className="h-3 w-3 mr-1" />
-                Test DB Connection
-              </>
-            )}
-          </Button>
-
-          {testResult && (
-            <Card className="mt-2">
-              <CardContent className="pt-3">
-                <pre className="text-xs overflow-auto">
-                  {JSON.stringify(testResult, null, 2)}
-                </pre>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="p-4 border-t">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-            <User className="h-4 w-4 text-primary" />
+          <div className="text-xs text-muted-foreground mb-3">
+            {user?.email}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">
-              {user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">
-              {user?.email || 'No email'}
-            </p>
+          <div className="space-y-1">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full justify-start"
+            >
+              <Settings className="h-3 w-3 mr-2" />
+              Settings
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={signOut}
+              className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/20"
+            >
+              <LogOut className="h-3 w-3 mr-2" />
+              Sign Out
+            </Button>
           </div>
-        </div>
-        
-        <div className="space-y-1">
-          <Button variant="ghost" size="sm" className="w-full justify-start">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="w-full justify-start text-red-600 hover:text-red-700"
-            onClick={signOut}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
-          </Button>
         </div>
       </div>
     </div>
   );
+
+  // Mobile toggle button
+  const mobileToggle = (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => setIsMobileOpen(!isMobileOpen)}
+      className="lg:hidden fixed top-4 left-4 z-50 bg-background border shadow-lg"
+    >
+      {isMobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+    </Button>
+  );
+
+  if (isMobile) {
+    return (
+      <>
+        {mobileToggle}
+        {isMobileOpen && (
+          <div className="fixed inset-0 z-40 lg:hidden">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileOpen(false)} />
+            <div className="fixed left-0 top-0 h-full w-80 max-w-[85vw] z-50">
+              {sidebarContent}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return sidebarContent;
 }

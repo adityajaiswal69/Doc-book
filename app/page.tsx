@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Plus, User, Database } from "lucide-react";
 import TestAuth from "@/components/TestAuth";
+import { toast } from "sonner";
 
 export default function HomePage() {
   const { user, session } = useAuth();
@@ -16,7 +17,7 @@ export default function HomePage() {
 
   const handleCreateDocument = () => {
     if (!user?.id) {
-      alert('Please sign in to create a document');
+      toast.error('Please sign in to create a document');
       return;
     }
 
@@ -24,10 +25,11 @@ export default function HomePage() {
       try {
         const result = await createDocument(user.id);
         console.log('Document created:', result);
+        toast.success('Document created successfully!');
         router.push(`/doc/${result.docId}`);
       } catch (error) {
         console.error('Failed to create document:', error);
-        alert('Failed to create document. Please try again.');
+        toast.error('Failed to create document. Please try again.');
       }
     });
   };

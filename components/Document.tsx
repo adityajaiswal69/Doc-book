@@ -2,12 +2,11 @@
 
 import Editor from "./Editor"
 
-
 const Document = ({id}:{
  id:string
 }) => {
   return (
-    <div>
+    <div className="h-full w-full">
       <Editor/>
     </div>
   )

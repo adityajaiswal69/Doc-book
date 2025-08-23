@@ -1,26 +1,22 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { User, Session } from "@supabase/supabase-js";
+import { toast } from "sonner";
 
-interface AuthContextType {
+type AuthContextType = {
   user: User | null;
   session: Session | null;
   loading: boolean;
   signOut: () => Promise<void>;
-}
+};
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  session: null,
-  loading: true,
-  signOut: async () => {},
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
@@ -72,8 +68,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Signing out...');
       await supabase.auth.signOut();
+      toast.success('Signed out successfully');
     } catch (error) {
       console.error('Error signing out:', error);
+      toast.error('Error signing out');
     }
   };
 

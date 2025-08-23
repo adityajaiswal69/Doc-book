@@ -38,6 +38,7 @@ export async function createDocument(userId: string) {
       .from('documents')
       .insert({
         title: "Untitled Document",
+        content: "", // Ensure content field is set
       })
       .select()
       .single()
@@ -50,13 +51,15 @@ export async function createDocument(userId: string) {
     console.log('Document created:', document.id)
 
     // Create user room relationship
-    const { error: userRoomError } = await supabase
+    const { data: userRoom, error: userRoomError } = await supabase
       .from('user_rooms')
       .insert({
         user_id: userId,
         room_id: document.id,
         role: 'owner',
       })
+      .select()
+      .single()
 
     if (userRoomError) {
       console.error('User room creation error:', userRoomError)
@@ -65,7 +68,7 @@ export async function createDocument(userId: string) {
       throw new Error(`Failed to create user room: ${userRoomError.message}`)
     }
 
-    console.log('User room created successfully')
+    console.log('User room created successfully:', userRoom)
 
     return { docId: document.id }
   } catch (error) {
@@ -173,7 +176,18 @@ export async function updateDocument(id: string, updates: { title?: string; cont
       .eq('room_id', id)
       .single()
 
-    if (userRoomError || !userRoom) {
+    console.log('User room check result:', { userRoom, userRoomError })
+
+    if (userRoomError) {
+      console.error('Error checking user room access:', userRoomError)
+      // Check if it's a "no rows returned" error (which is expected if user has no access)
+      if (userRoomError.code === 'PGRST116') {
+        throw new Error("Access denied to this document")
+      }
+      throw new Error(`Database error: ${userRoomError.message}`)
+    }
+
+    if (!userRoom) {
       console.error('User does not have access to document:', id)
       throw new Error("Access denied to this document")
     }
@@ -227,6 +241,147 @@ export async function testDatabaseConnection(userId: string) {
     return { userRooms, error: userRoomsError }
   } catch (error) {
     console.error('Error in testDatabaseConnection:', error)
+    throw error
+  }
+}
+
+export async function checkUserDocumentAccess(userId: string, documentId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Checking user access to document:', { userId, documentId })
+
+    // Check if document exists
+    const { data: document, error: documentError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', documentId)
+      .single()
+
+    if (documentError) {
+      console.error('Document not found:', documentError)
+      return { hasAccess: false, reason: 'Document not found', document: null, userRoom: null }
+    }
+
+    // Check if user has access
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError) {
+      console.error('Error checking user room:', userRoomError)
+      return { hasAccess: false, reason: 'Database error checking access', document, userRoom: null }
+    }
+
+    if (!userRoom) {
+      console.error('User has no access to document')
+      return { hasAccess: false, reason: 'No user room relationship found', document, userRoom: null }
+    }
+
+    console.log('User has access to document')
+    return { hasAccess: true, reason: 'Access granted', document, userRoom }
+  } catch (error) {
+    console.error('Error in checkUserDocumentAccess:', error)
+    throw error
+  }
+}
+
+export async function repairUserDocumentAccess(userId: string, documentId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Attempting to repair user access to document:', { userId, documentId })
+
+    // First check current access
+    const accessCheck = await checkUserDocumentAccess(userId, documentId)
+    
+    if (accessCheck.hasAccess) {
+      console.log('User already has access, no repair needed')
+      return { success: true, message: 'Access already exists' }
+    }
+
+    // Check if document exists
+    if (!accessCheck.document) {
+      throw new Error('Document not found')
+    }
+
+    // Create user room relationship
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .insert({
+        user_id: userId,
+        room_id: documentId,
+        role: 'owner',
+      })
+      .select()
+      .single()
+
+    if (userRoomError) {
+      console.error('Failed to create user room:', userRoomError)
+      throw new Error(`Failed to repair access: ${userRoomError.message}`)
+    }
+
+    console.log('Successfully repaired user access')
+    return { success: true, message: 'Access repaired successfully', userRoom }
+  } catch (error) {
+    console.error('Error in repairUserDocumentAccess:', error)
+    throw error
+  }
+}
+
+export async function deleteDocument(documentId: string, userId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Deleting document with ID:', documentId, 'for user:', userId)
+
+    // First check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', documentId)
+      throw new Error("Access denied to this document")
+    }
+
+    // Check if user is owner (only owners can delete)
+    if (userRoom.role !== 'owner') {
+      throw new Error("Only document owners can delete documents")
+    }
+
+    // Delete all user room relationships for this document
+    const { error: deleteUserRoomsError } = await supabase
+      .from('user_rooms')
+      .delete()
+      .eq('room_id', documentId)
+
+    if (deleteUserRoomsError) {
+      console.error('Error deleting user rooms:', deleteUserRoomsError)
+      throw new Error(`Failed to delete user rooms: ${deleteUserRoomsError.message}`)
+    }
+
+    // Delete the document
+    const { error: deleteDocumentError } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', documentId)
+
+    if (deleteDocumentError) {
+      console.error('Error deleting document:', deleteDocumentError)
+      throw new Error(`Failed to delete document: ${deleteDocumentError.message}`)
+    }
+
+    console.log('Document deleted successfully')
+    return { success: true, message: 'Document deleted successfully' }
+  } catch (error) {
+    console.error('Error in deleteDocument:', error)
     throw error
   }
 }

@@ -80,3 +80,31 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  /* Mobile-first responsive utilities */
+  .mobile-only {
+    @apply block lg:hidden;
+  }
+  
+  .desktop-only {
+    @apply hidden lg:block;
+  }
+  
+  /* Ensure proper touch targets on mobile */
+  @media (max-width: 768px) {
+    button, [role="button"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    
+    input, textarea {
+      font-size: 16px; /* Prevents zoom on iOS */
+    }
+  }
+  
+  /* Smooth transitions for sidebar */
+  .sidebar-transition {
+    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+  }
+}

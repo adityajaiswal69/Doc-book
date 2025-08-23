@@ -7,6 +7,7 @@ import AppSidebar from "@/components/app-sidebar";
 import AuthForm from "@/components/auth/AuthForm";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "Note Forge - Your Notion Alternative",
@@ -27,16 +28,25 @@ export default function RootLayout({
               <AuthGuard>
                 <SidebarProvider>
                   <div className="flex h-screen bg-background">
-                    <AppSidebar />
-                    <main className="flex-1 flex flex-col overflow-hidden">
+                    {/* Sidebar - hidden on mobile, shown on desktop */}
+                    <div className="hidden lg:block">
+                      <AppSidebar />
+                    </div>
+                    {/* Main content - full width on mobile, with sidebar on desktop */}
+                    <main className="flex-1 flex flex-col overflow-hidden lg:ml-0">
                       {children}
                     </main>
+                  </div>
+                  {/* Mobile sidebar overlay */}
+                  <div className="lg:hidden">
+                    <AppSidebar />
                   </div>
                 </SidebarProvider>
               </AuthGuard>
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   );

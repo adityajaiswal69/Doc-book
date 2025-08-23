@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 
 export default function AuthForm() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -39,7 +40,7 @@ export default function AuthForm() {
         
         if (data.user && !data.session) {
           // Email confirmation required
-          alert("Please check your email for confirmation link!");
+          toast.info("Please check your email for confirmation link!");
         }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -51,6 +52,7 @@ export default function AuthForm() {
       }
     } catch (error: any) {
       setError(error.message);
+      toast.error(error.message);
     } finally {
       setLoading(false);
     }
@@ -66,7 +68,7 @@ export default function AuthForm() {
       });
       if (error) throw error;
     } catch (error: any) {
-      setError(error.message);
+      toast.error(error.message);
     }
   };
 
