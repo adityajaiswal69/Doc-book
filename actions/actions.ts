@@ -167,6 +167,10 @@ export async function updateDocument(id: string, updates: { title?: string; cont
     const supabase = await createServerSupabaseClient()
     
     console.log('Updating document with ID:', id, 'for user:', userId)
+    console.log('Update type:', updates.title ? 'title' : updates.content ? 'content' : 'both')
+    if (updates.content) {
+      console.log('Content length:', updates.content.length, 'characters')
+    }
 
     // First check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -192,10 +196,15 @@ export async function updateDocument(id: string, updates: { title?: string; cont
       throw new Error("Access denied to this document")
     }
 
-    // Update the document
+    // Update the document with optimized handling for large content
+    const updateData = {
+      ...updates,
+      updated_at: new Date().toISOString() // Ensure timestamp is updated
+    }
+
     const { data: document, error: documentError } = await supabase
       .from('documents')
-      .update(updates)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()
@@ -205,7 +214,13 @@ export async function updateDocument(id: string, updates: { title?: string; cont
       throw new Error(`Failed to update document: ${documentError.message}`)
     }
 
-    console.log('Document updated:', document)
+    console.log('Document updated successfully:', {
+      id: document.id,
+      titleLength: document.title?.length || 0,
+      contentLength: document.content?.length || 0,
+      updatedAt: document.updated_at
+    })
+    
     return { document }
   } catch (error) {
     console.error('Error in updateDocument:', error)

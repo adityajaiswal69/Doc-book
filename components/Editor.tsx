@@ -6,9 +6,26 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Save, Loader2, Lock, ChevronDown, FileText } from "lucide-react";
+import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
+
+interface Block {
+  id: string;
+  type: string;
+  content: string;
+  metadata?: any;
+}
+
+interface CommandItem {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  shortcut?: string;
+  preview: React.ReactNode;
+  action: (content: string) => { newContent: string; newCursorPosition: number };
+}
 
 export default function Editor() {
   const params = useParams();
@@ -17,49 +34,314 @@ export default function Editor() {
   const { document, loading, error, saving, saveDocument } = useDocument(documentId);
   
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [blocks, setBlocks] = useState<Block[]>([]);
   const [titleChanged, setTitleChanged] = useState(false);
   const [contentChanged, setContentChanged] = useState(false);
+
+  // Command palette state
+  const [showCommands, setShowCommands] = useState(false);
+  const [commandFilter, setCommandFilter] = useState("");
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   
-  // Refs to store timeout IDs for debouncing
+  // Refs
   const titleSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const contentSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Refs to track if we're currently saving to prevent double-saves
   const isSavingTitleRef = useRef(false);
   const isSavingContentRef = useRef(false);
+  const blockRefs = useRef<{ [key: string]: HTMLTextAreaElement }>({});
+  const commandPaletteRef = useRef<HTMLDivElement>(null);
 
-  // Update local state when document loads (only on initial load or document change)
+  // Advanced commands with previews
+  const commands: CommandItem[] = [
+    {
+      id: "heading-1",
+      title: "Heading 1",
+      description: "Large section heading",
+      icon: <Hash className="h-4 w-4" />,
+      shortcut: "#",
+      preview: <div className="text-2xl font-bold text-white">Heading 1</div>,
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    },
+    {
+      id: "heading-2",
+      title: "Heading 2",
+      description: "Medium section heading",
+      icon: <Hash className="h-4 w-4" />,
+      shortcut: "##",
+      preview: <div className="text-xl font-semibold text-white">Heading 2</div>,
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    },
+    {
+      id: "heading-3",
+      title: "Heading 3",
+      description: "Small section heading",
+      icon: <Hash className="h-4 w-4" />,
+      shortcut: "###",
+      preview: <div className="text-lg font-medium text-white">Heading 3</div>,
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    },
+    {
+      id: "text",
+      title: "Text",
+      description: "Plain text block",
+      icon: <Type className="h-4 w-4" />,
+      preview: <div className="text-gray-200">Plain text block</div>,
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    },
+    {
+      id: "bulleted-list",
+      title: "Bulleted list",
+      description: "Simple bulleted list",
+      icon: <List className="h-4 w-4" />,
+      shortcut: "-",
+      preview: (
+        <div className="flex items-start">
+          <span className="text-blue-400 mr-3 mt-1">•</span>
+          <span className="text-gray-200">List item</span>
+        </div>
+      ),
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    },
+    {
+      id: "numbered-list",
+      title: "Numbered list",
+      description: "Ordered numbered list",
+      icon: <List className="h-4 w-4" />,
+      shortcut: "1.",
+      preview: (
+        <div className="flex items-start">
+          <span className="text-blue-400 mr-3 mt-1 min-w-[20px]">1.</span>
+          <span className="text-gray-200">List item</span>
+        </div>
+      ),
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    },
+    {
+      id: "todo-list",
+      title: "To-do list",
+      description: "Checkbox task list",
+      icon: <CheckSquare className="h-4 w-4" />,
+      shortcut: "[ ]",
+      preview: (
+        <div className="flex items-start">
+          <input type="checkbox" className="mr-3 mt-1" />
+          <span className="text-gray-200">Task item</span>
+        </div>
+      ),
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    },
+    {
+      id: "quote",
+      title: "Quote",
+      description: "Blockquote for citations",
+      icon: <Quote className="h-4 w-4" />,
+      shortcut: ">",
+      preview: (
+        <div className="border-l-4 border-gray-600 pl-4 py-2 italic text-gray-300">
+          Quote text
+        </div>
+      ),
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    },
+    {
+      id: "code-block",
+      title: "Code block",
+      description: "Code snippet with syntax highlighting",
+      icon: <Code className="h-4 w-4" />,
+      shortcut: "```",
+      preview: (
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 font-mono text-sm text-green-400">
+          Code block
+        </div>
+      ),
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    },
+    {
+      id: "divider",
+      title: "Divider",
+      description: "Horizontal line separator",
+      icon: <Minus className="h-4 w-4" />,
+      shortcut: "---",
+      preview: <div className="border-t border-gray-600 my-4"></div>,
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    },
+    {
+      id: "table",
+      title: "Table",
+      description: "Data table with rows and columns",
+      icon: <Table className="h-4 w-4" />,
+      preview: (
+        <div className="border border-gray-600 rounded-lg overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-800">
+              <tr>
+                <th className="px-3 py-2 text-left text-gray-200">Header 1</th>
+                <th className="px-3 py-2 text-left text-gray-200">Header 2</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t border-gray-600">
+                <td className="px-3 py-2 text-gray-200">Cell 1</td>
+                <td className="px-3 py-2 text-gray-200">Cell 2</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      ),
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    },
+    {
+      id: "image",
+      title: "Image",
+      description: "Insert an image",
+      icon: <Image className="h-4 w-4" />,
+      preview: (
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
+          <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+          <div className="text-gray-400 text-sm">Image block</div>
+        </div>
+      ),
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    },
+    {
+      id: "video",
+      title: "Video",
+      description: "Insert a video",
+      icon: <Video className="h-4 w-4" />,
+      preview: (
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
+          <Video className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+          <div className="text-gray-400 text-sm">Video block</div>
+        </div>
+      ),
+      action: (content) => ({
+        newContent: content,
+        newCursorPosition: content.length
+      })
+    }
+  ];
+
+  // Filter commands based on search
+  const filteredCommands = commands.filter(cmd =>
+    cmd.title.toLowerCase().includes(commandFilter.toLowerCase()) ||
+    cmd.description.toLowerCase().includes(commandFilter.toLowerCase())
+  );
+
+  // Initialize blocks from document content
   useEffect(() => {
     if (document && !titleChanged && !contentChanged) {
       setTitle(document.title || "");
-      setContent(document.content || "");
+      
+      // Parse content into blocks
+      const content = document.content || "";
+      if (content) {
+        const lines = content.split('\n');
+        const newBlocks: Block[] = [];
+        let currentBlock: Block | null = null;
+        
+        lines.forEach((line, index) => {
+          const trimmedLine = line.trim();
+          
+          if (trimmedLine.startsWith('# ')) {
+            if (currentBlock) newBlocks.push(currentBlock);
+            currentBlock = { id: `block-${index}`, type: 'heading-1', content: trimmedLine.substring(2) };
+          } else if (trimmedLine.startsWith('## ')) {
+            if (currentBlock) newBlocks.push(currentBlock);
+            currentBlock = { id: `block-${index}`, type: 'heading-2', content: trimmedLine.substring(3) };
+          } else if (trimmedLine.startsWith('### ')) {
+            if (currentBlock) newBlocks.push(currentBlock);
+            currentBlock = { id: `block-${index}`, type: 'heading-3', content: trimmedLine.substring(4) };
+          } else if (trimmedLine.startsWith('- ')) {
+            if (currentBlock) newBlocks.push(currentBlock);
+            currentBlock = { id: `block-${index}`, type: 'bulleted-list', content: trimmedLine.substring(2) };
+          } else if (trimmedLine.startsWith('1. ')) {
+            if (currentBlock) newBlocks.push(currentBlock);
+            currentBlock = { id: `block-${index}`, type: 'numbered-list', content: trimmedLine.substring(3) };
+          } else if (trimmedLine.match(/^- \[ \]/)) {
+            if (currentBlock) newBlocks.push(currentBlock);
+            currentBlock = { id: `block-${index}`, type: 'todo-list', content: trimmedLine.substring(6) };
+          } else if (trimmedLine.startsWith('> ')) {
+            if (currentBlock) newBlocks.push(currentBlock);
+            currentBlock = { id: `block-${index}`, type: 'quote', content: trimmedLine.substring(2) };
+          } else if (trimmedLine.startsWith('```')) {
+            if (currentBlock) newBlocks.push(currentBlock);
+            currentBlock = { id: `block-${index}`, type: 'code-block', content: '// Your code here' };
+          } else if (trimmedLine === '---') {
+            if (currentBlock) newBlocks.push(currentBlock);
+            currentBlock = { id: `block-${index}`, type: 'divider', content: '' };
+          } else if (trimmedLine === '') {
+            if (currentBlock) newBlocks.push(currentBlock);
+            currentBlock = { id: `block-${index}`, type: 'text', content: '' };
+          } else {
+            if (currentBlock && currentBlock.type === 'text') {
+              currentBlock.content += (currentBlock.content ? '\n' : '') + trimmedLine;
+            } else {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { id: `block-${index}`, type: 'text', content: trimmedLine };
+            }
+          }
+        });
+        
+        if (currentBlock) newBlocks.push(currentBlock);
+        setBlocks(newBlocks);
+      } else {
+        // Create initial empty text block
+        setBlocks([{ id: 'block-0', type: 'text', content: '' }]);
+      }
+      
       setTitleChanged(false);
       setContentChanged(false);
     }
-  }, [document?.id]); // Only depend on document ID, not the entire document object
+  }, [document?.id]);
 
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (titleSaveTimeoutRef.current) clearTimeout(titleSaveTimeoutRef.current);
-      if (contentSaveTimeoutRef.current) clearTimeout(contentSaveTimeoutRef.current);
-    };
-  }, []);
-
-  // Auto-save title changes with improved debouncing
+  // Auto-save title changes
   const handleTitleChange = useCallback(async (newTitle: string) => {
     setTitle(newTitle);
     setTitleChanged(true);
     
-    // Clear existing timeout
     if (titleSaveTimeoutRef.current) {
       clearTimeout(titleSaveTimeoutRef.current);
     }
     
-    // Set new timeout for debounced save
     titleSaveTimeoutRef.current = setTimeout(async () => {
-      if (isSavingTitleRef.current) return; // Prevent double-saves
+      if (isSavingTitleRef.current) return;
       
       try {
         isSavingTitleRef.current = true;
@@ -67,67 +349,360 @@ export default function Editor() {
         setTitleChanged(false);
       } catch (error) {
         console.error('Failed to save title:', error);
-        // Keep the changed state if save failed
         setTitleChanged(true);
       } finally {
         isSavingTitleRef.current = false;
       }
-    }, 1500); // Increased debounce time for smoother experience
+    }, 1000);
   }, [saveDocument]);
 
-  // Auto-save content changes with improved debouncing
-  const handleContentChange = useCallback(async (newContent: string) => {
-    setContent(newContent);
+  // Handle block content changes
+  const handleBlockChange = useCallback(async (blockId: string, newContent: string, newType?: string) => {
+    setBlocks(prev => prev.map(block => 
+      block.id === blockId 
+        ? { ...block, content: newContent, type: newType || block.type }
+        : block
+    ));
     setContentChanged(true);
     
-    // Clear existing timeout
+    // Auto-save
     if (contentSaveTimeoutRef.current) {
       clearTimeout(contentSaveTimeoutRef.current);
     }
     
-    // Set new timeout for debounced save
     contentSaveTimeoutRef.current = setTimeout(async () => {
-      if (isSavingContentRef.current) return; // Prevent double-saves
+      if (isSavingContentRef.current) return;
       
       try {
         isSavingContentRef.current = true;
-        await saveDocument({ content: newContent });
+        const content = blocks.map(block => {
+          switch (block.type) {
+            case 'heading-1': return `# ${block.content}`;
+            case 'heading-2': return `## ${block.content}`;
+            case 'heading-3': return `### ${block.content}`;
+            case 'bulleted-list': return `- ${block.content}`;
+            case 'numbered-list': return `1. ${block.content}`;
+            case 'todo-list': return `- [ ] ${block.content}`;
+            case 'quote': return `> ${block.content}`;
+            case 'code-block': return `\`\`\`\n${block.content}\n\`\`\``;
+            case 'divider': return `---`;
+            default: return block.content;
+          }
+        }).join('\n');
+        
+        await saveDocument({ content });
         setContentChanged(false);
       } catch (error) {
         console.error('Failed to save content:', error);
-        // Keep the changed state if save failed
         setContentChanged(true);
       } finally {
         isSavingContentRef.current = false;
       }
-    }, 2000); // Increased debounce time for smoother experience
-  }, [saveDocument]);
+    }, 1500);
+  }, [blocks, saveDocument]);
 
-  // Manual save function for immediate saving
-  const handleManualSave = useCallback(async () => {
-    try {
-      await saveDocument({ title, content });
-      setTitleChanged(false);
-      setContentChanged(false);
-    } catch (error) {
-      console.error('Failed to save document:', error);
+  // Handle slash commands
+  const handleSlashCommand = useCallback((blockId: string, content: string) => {
+    if (content.trim() === '/') {
+      setShowCommands(true);
+      setActiveBlockId(blockId);
+      setCommandFilter("");
+      setSelectedCommandIndex(0);
+    } else if (content.startsWith('/') && content.length > 1) {
+      setShowCommands(true);
+      setActiveBlockId(blockId);
+      setCommandFilter(content.slice(1));
+      setSelectedCommandIndex(0);
+    } else {
+      setShowCommands(false);
     }
-  }, [saveDocument, title, content]);
+  }, []);
 
-  // Keyboard shortcut for saving (Ctrl+S / Cmd+S)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (titleChanged || contentChanged) {
-          handleManualSave();
+  // Handle command selection
+  const handleCommandSelect = useCallback(async (command: CommandItem) => {
+    if (!activeBlockId) return;
+    
+    const result = command.action(blocks.find(b => b.id === activeBlockId)?.content || '');
+    
+    setBlocks(prev => prev.map(block => 
+      block.id === activeBlockId 
+        ? { ...block, content: result.newContent, type: command.id }
+        : block
+    ));
+    
+    setShowCommands(false);
+    setActiveBlockId(null);
+    setContentChanged(true);
+    
+    // Focus the block after type change
+    setTimeout(() => {
+      const blockElement = blockRefs.current[activeBlockId];
+      if (blockElement) {
+        blockElement.focus();
+        blockElement.setSelectionRange(result.newCursorPosition, result.newCursorPosition);
+      }
+    }, 10);
+    
+    toast.success(`${command.title} applied`);
+  }, [activeBlockId, blocks]);
+
+  // Handle keyboard navigation
+  const handleCommandKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedCommandIndex(prev => 
+        prev < filteredCommands.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedCommandIndex(prev => 
+        prev > 0 ? prev - 1 : filteredCommands.length - 1
+      );
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filteredCommands[selectedCommandIndex]) {
+        handleCommandSelect(filteredCommands[selectedCommandIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setShowCommands(false);
+      setActiveBlockId(null);
+    }
+  }, [filteredCommands, selectedCommandIndex, handleCommandSelect]);
+
+  // Add new block
+  const addBlock = useCallback((afterBlockId: string) => {
+    const newBlock: Block = { id: `block-${Date.now()}`, type: 'text', content: '' };
+    setBlocks(prev => {
+      const index = prev.findIndex(b => b.id === afterBlockId);
+      const newBlocks = [...prev];
+      newBlocks.splice(index + 1, 0, newBlock);
+      return newBlocks;
+    });
+    
+    // Focus new block
+    setTimeout(() => {
+      const blockElement = blockRefs.current[newBlock.id];
+      if (blockElement) {
+        blockElement.focus();
+      }
+    }, 10);
+  }, []);
+
+  // Track last Enter press time for double-Enter detection
+  const lastEnterPressRef = useRef<{ [key: string]: number }>({});
+
+  // Auto-resize textarea height based on content
+  const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement) => {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  }, []);
+
+  // Handle block key events
+  const handleBlockKeyDown = useCallback((e: React.KeyboardEvent, blockId: string) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      
+      const now = Date.now();
+      const lastPress = lastEnterPressRef.current[blockId] || 0;
+      const timeDiff = now - lastPress;
+      
+      // Only create new block if Enter is pressed twice within 500ms
+      if (timeDiff < 500) {
+        addBlock(blockId);
+        // Reset the timer after creating block
+        lastEnterPressRef.current[blockId] = 0;
+      } else {
+        // Update the last press time and insert newline
+        lastEnterPressRef.current[blockId] = now;
+        
+        // Insert newline at cursor position
+        const textarea = blockRefs.current[blockId];
+        if (textarea) {
+          const cursorPos = textarea.selectionStart;
+          const content = blocks.find(b => b.id === blockId)?.content || '';
+          const newContent = content.slice(0, cursorPos) + '\n' + content.slice(cursorPos);
+          
+          // Update the block content
+          setBlocks(prev => prev.map(b => 
+            b.id === blockId ? { ...b, content: newContent } : b
+          ));
+          
+          // Set cursor position after newline and auto-resize
+          setTimeout(() => {
+            textarea.setSelectionRange(cursorPos + 1, cursorPos + 1);
+            textarea.focus();
+            autoResizeTextarea(textarea);
+          }, 0);
         }
       }
+    } else if (e.key === 'Backspace') {
+      const block = blocks.find(b => b.id === blockId);
+      if (block && block.content === '' && blocks.length > 1) {
+        e.preventDefault();
+        setBlocks(prev => prev.filter(b => b.id !== blockId));
+      }
+    }
+  }, [blocks, addBlock]);
+
+  // Render block based on type
+  const renderBlock = (block: Block) => {
+    const commonProps = {
+      ref: (el: HTMLTextAreaElement) => {
+        if (el) {
+          blockRefs.current[block.id] = el;
+          // Auto-resize on initial render
+          setTimeout(() => autoResizeTextarea(el), 0);
+        }
+      },
+      value: block.content,
+      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const newContent = e.target.value;
+        handleBlockChange(block.id, newContent);
+        handleSlashCommand(block.id, newContent);
+        // Auto-resize the textarea
+        autoResizeTextarea(e.target);
+      },
+      onKeyDown: (e: React.KeyboardEvent) => handleBlockKeyDown(e, block.id),
+      placeholder: `Type '/' for commands...`,
+      className: "w-full resize-none border-none outline-none bg-transparent text-white editor-textarea",
+      style: {
+        fontSize: '16px',
+        lineHeight: '1.6',
+        padding: '0',
+        margin: '0',
+        caretColor: 'white',
+        caretShape: 'block' as const
+      },
+      spellCheck: false,
+      autoComplete: "off",
+      autoCorrect: "off",
+      autoCapitalize: "off"
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleManualSave, titleChanged, contentChanged]);
+    switch (block.type) {
+      case 'heading-1':
+        return (
+          <textarea
+            {...commonProps}
+            style={{ ...commonProps.style, fontSize: '32px', fontWeight: 'bold', caretShape: 'block' as const }}
+            placeholder="Heading 1"
+          />
+        );
+      case 'heading-2':
+        return (
+          <textarea
+            {...commonProps}
+            style={{ ...commonProps.style, fontSize: '24px', fontWeight: '600', caretShape: 'block' as const }}
+            placeholder="Heading 2"
+          />
+        );
+      case 'heading-3':
+        return (
+          <textarea
+            {...commonProps}
+            style={{ ...commonProps.style, fontSize: '20px', fontWeight: '500', caretShape: 'block' as const }}
+            placeholder="Heading 3"
+          />
+        );
+      case 'bulleted-list':
+        return (
+          <div className="flex items-start">
+            <span className="text-blue-400 mr-3 mt-3 text-lg">•</span>
+            <textarea
+              {...commonProps}
+              style={{ ...commonProps.style, flex: 1, caretShape: 'block' as const }}
+              placeholder="List item"
+            />
+          </div>
+        );
+      case 'numbered-list':
+        return (
+          <div className="flex items-start">
+            <span className="text-blue-400 mr-3 mt-3 min-w-[20px] text-lg">1.</span>
+            <textarea
+              {...commonProps}
+              style={{ ...commonProps.style, flex: 1, caretShape: 'block' as const }}
+              placeholder="List item"
+            />
+          </div>
+        );
+      case 'todo-list':
+        return (
+          <div className="flex items-start">
+            <input type="checkbox" className="mr-3 mt-3" />
+            <textarea
+              {...commonProps}
+              style={{ ...commonProps.style, flex: 1, caretShape: 'block' as const }}
+              placeholder="Task item"
+            />
+          </div>
+        );
+      case 'quote':
+        return (
+          <div className="border-l-4 border-gray-600 pl-4">
+            <textarea
+              {...commonProps}
+              style={{ ...commonProps.style, fontStyle: 'italic', caretShape: 'block' as const }}
+              placeholder="Quote text"
+            />
+          </div>
+        );
+      case 'code-block':
+        return (
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+            <textarea
+              {...commonProps}
+              style={{ ...commonProps.style, fontFamily: 'monospace', color: '#10b981', caretShape: 'block' as const }}
+              placeholder="// Your code here"
+            />
+          </div>
+        );
+      case 'divider':
+        return (
+          <div className="border-t border-gray-600 my-4"></div>
+        );
+      case 'table':
+        return (
+          <div className="border border-gray-600 rounded-lg overflow-hidden">
+            <textarea
+              {...commonProps}
+              style={{ ...commonProps.style, fontFamily: 'monospace', caretShape: 'block' as const }}
+              placeholder="Table content"
+            />
+          </div>
+        );
+      case 'image':
+        return (
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
+            <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+            <textarea
+              {...commonProps}
+              style={{ ...commonProps.style, textAlign: 'center', caretShape: 'block' as const }}
+              placeholder="Image description or URL"
+            />
+          </div>
+        );
+      case 'video':
+        return (
+          <div className="bg-gray-700 rounded-lg p-4 text-center">
+            <Video className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+            <textarea
+              {...commonProps}
+              style={{ ...commonProps.style, textAlign: 'center', caretShape: 'block' as const }}
+              placeholder="Video description or URL"
+            />
+          </div>
+        );
+      default:
+        return (
+          <textarea
+            {...commonProps}
+            placeholder="Type '/' for commands..."
+          />
+        );
+    }
+  };
 
   if (loading) {
     return (
@@ -196,8 +771,8 @@ export default function Editor() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header with Notion-style layout */}
+    <div className="flex flex-col h-full relative">
+      {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
@@ -221,54 +796,144 @@ export default function Editor() {
           
           <div className="flex items-center gap-3">
             <div className="text-xs text-muted-foreground">
-              Edited just now
+              {saving ? 'Saving...' : contentChanged ? 'Unsaved changes' : 'All changes saved'}
             </div>
             
-            <Button variant="ghost" size="sm" className="h-8">
-              <span className="mr-2">Share</span>
-              <div className="h-4 w-4 rounded-full bg-yellow-500"></div>
-            </Button>
-            
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <span className="text-lg">⋯</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8"
+              onClick={async () => {
+                try {
+                  const content = blocks.map(block => {
+                    switch (block.type) {
+                      case 'heading-1': return `# ${block.content}`;
+                      case 'heading-2': return `## ${block.content}`;
+                      case 'heading-3': return `### ${block.content}`;
+                      case 'bulleted-list': return `- ${block.content}`;
+                      case 'numbered-list': return `1. ${block.content}`;
+                      case 'todo-list': return `- [ ] ${block.content}`;
+                      case 'quote': return `> ${block.content}`;
+                      case 'code-block': return `\`\`\`\n${block.content}\n\`\`\``;
+                      case 'divider': return `---`;
+                      default: return block.content;
+                    }
+                  }).join('\n');
+                  
+                  await saveDocument({ title, content });
+                  setTitleChanged(false);
+                  setContentChanged(false);
+                  toast.success('Document saved!');
+                } catch (error) {
+                  console.error('Failed to save document:', error);
+                  toast.error('Failed to save document');
+                }
+              }}
+              disabled={!titleChanged && !contentChanged}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save
             </Button>
           </div>
         </div>
       </div>
 
       {/* Content editor */}
-      <div className="flex-1 px-6 lg:px-8">
-        <div className="w-full">
-          {/* Centered Document Title */}
+      <div className="flex-1 px-6 lg:px-8 overflow-y-auto">
+        <div className="max-w-4xl mx-auto py-8">
+          {/* Document title */}
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-4">
+            <h1 className="text-4xl font-bold mb-4 text-white">
               {title || 'Untitled Document'}
             </h1>
           </div>
           
-          <div className="prose prose-invert max-w-none">
-            <textarea
-              value={content}
-              onChange={(e) => handleContentChange(e.target.value)}
-              placeholder="|Write, press 'space' for AI, '/' for commands..."
-              className="w-full h-full resize-none border-none outline-none text-base leading-relaxed bg-transparent p-0 text-left"
-              style={{ minHeight: 'calc(100vh - 300px)' }}
-            />
+          {/* Blocks */}
+          <div className="space-y-4">
+            {blocks.map((block, index) => (
+              <div key={block.id} className="block-container" data-type={block.type}>
+                {renderBlock(block)}
+              </div>
+            ))}
+          </div>
+          
+          {/* Add new block button */}
+          <div className="mt-8 text-center">
+            <Button
+              variant="ghost"
+              onClick={() => addBlock(blocks[blocks.length - 1]?.id || '')}
+              className="text-gray-400 hover:text-white"
+            >
+              + Add new block
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Footer with document info */}
-      <div className="border-t px-6 py-3">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <div>
-            Last saved: {document.updated_at ? new Date(document.updated_at).toLocaleString() : 'Never'}
+      {/* Command Palette */}
+      {showCommands && (
+        <div 
+          ref={commandPaletteRef}
+          className="fixed z-50 w-96 bg-gray-800 border border-gray-700 rounded-lg shadow-xl"
+          style={{
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            maxHeight: '80vh'
+          }}
+        >
+          {/* Search/Filter */}
+          <div className="p-3 border-b border-gray-700">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Filter commands..."
+                value={commandFilter}
+                onChange={(e) => setCommandFilter(e.target.value)}
+                onKeyDown={handleCommandKeyDown}
+                className="pl-10 h-8 text-sm bg-gray-700 border-gray-600 text-white"
+                autoFocus
+              />
+            </div>
           </div>
-          <div>
-            Document ID: {document.id.substring(0, 8)}...
+          
+          {/* Commands List */}
+          <div className="max-h-64 overflow-y-auto">
+            {filteredCommands.map((command, index) => (
+              <div
+                key={command.id}
+                className={`p-3 cursor-pointer hover:bg-gray-700 transition-colors ${
+                  index === selectedCommandIndex ? 'bg-gray-700' : ''
+                }`}
+                onClick={() => handleCommandSelect(command)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="text-gray-300">
+                      {command.icon}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-white font-medium text-sm">{command.title}</div>
+                      <div className="text-gray-400 text-xs">{command.description}</div>
+                    </div>
+                  </div>
+                  <div className="ml-4">
+                    {command.preview}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Footer */}
+          <div className="p-3 border-t border-gray-700 text-xs text-gray-500">
+            <div className="flex items-center justify-between">
+              <span>Type '/' for commands</span>
+              <span>esc to close</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

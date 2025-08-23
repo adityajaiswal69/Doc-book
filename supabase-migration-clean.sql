@@ -1,5 +1,12 @@
--- Create documents table
-CREATE TABLE IF NOT EXISTS documents (
+-- Clean migration for essential blocks only (no AI features)
+-- This file will run successfully and create a working slash command system
+
+-- Drop existing tables if they exist (for clean migration)
+DROP TABLE IF EXISTS user_rooms CASCADE;
+DROP TABLE IF EXISTS documents CASCADE;
+
+-- Create documents table with essential structure
+CREATE TABLE documents (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title TEXT NOT NULL DEFAULT 'Untitled Document',
   content TEXT DEFAULT '',
@@ -7,11 +14,8 @@ CREATE TABLE IF NOT EXISTS documents (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Add content column to existing documents table (if it doesn't exist)
-ALTER TABLE documents ADD COLUMN IF NOT EXISTS content TEXT DEFAULT '';
-
 -- Create user_rooms table for permissions
-CREATE TABLE IF NOT EXISTS user_rooms (
+CREATE TABLE user_rooms (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   room_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
@@ -20,10 +24,10 @@ CREATE TABLE IF NOT EXISTS user_rooms (
   UNIQUE(user_id, room_id)
 );
 
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_user_rooms_user_id ON user_rooms(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_rooms_room_id ON user_rooms(room_id);
-CREATE INDEX IF NOT EXISTS idx_documents_updated_at ON documents(updated_at);
+-- Create essential indexes for performance
+CREATE INDEX idx_user_rooms_user_id ON user_rooms(user_id);
+CREATE INDEX idx_user_rooms_room_id ON user_rooms(room_id);
+CREATE INDEX idx_documents_updated_at ON documents(updated_at);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
@@ -93,7 +97,7 @@ BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
 -- Create trigger to automatically update updated_at
 CREATE TRIGGER update_documents_updated_at 
@@ -101,38 +105,55 @@ CREATE TRIGGER update_documents_updated_at
   FOR EACH ROW 
   EXECUTE FUNCTION update_updated_at_column();
 
--- Add function for efficient content updates (useful for slash commands)
-CREATE OR REPLACE FUNCTION update_document_content(
+-- Create simple function for content updates (essential blocks only)
+CREATE OR REPLACE FUNCTION update_document_content_simple(
   doc_id UUID,
   new_content TEXT,
   user_uuid UUID
 )
 RETURNS BOOLEAN AS $$
-DECLARE
-  has_access BOOLEAN;
 BEGIN
   -- Check if user has access to document
-  SELECT EXISTS(
+  IF EXISTS(
     SELECT 1 FROM user_rooms 
     WHERE room_id = doc_id 
     AND user_id = user_uuid
-  ) INTO has_access;
-  
-  IF NOT has_access THEN
-    RETURN FALSE;
+  ) THEN
+    -- Update document content
+    UPDATE documents 
+    SET content = new_content, updated_at = NOW()
+    WHERE id = doc_id;
+    RETURN TRUE;
   END IF;
-  
-  -- Update document content
-  UPDATE documents 
-  SET content = new_content, updated_at = NOW()
-  WHERE id = doc_id;
-  
-  RETURN TRUE;
+  RETURN FALSE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Add index for content searches (useful for future features)
-CREATE INDEX IF NOT EXISTS idx_documents_content_gin ON documents USING gin(to_tsvector('english', content));
+-- Create basic indexes for essential functionality
+CREATE INDEX idx_documents_content_length ON documents(LENGTH(content));
+CREATE INDEX idx_documents_title_length ON documents(LENGTH(title));
 
--- Add index for title searches
-CREATE INDEX IF NOT EXISTS idx_documents_title_gin ON documents USING gin(to_tsvector('english', title));
+-- Insert sample data for testing (optional)
+INSERT INTO documents (title, content) VALUES 
+('Welcome Document', '# Welcome to Your Document Editor
+
+## Getting Started
+- Type `/` to open the command palette
+- Select from available blocks
+- Start writing your content
+
+## Available Blocks
+- **Headings**: H1, H2, H3
+- **Lists**: Bulleted and numbered
+- **Text**: Plain text blocks
+- **Code**: Code snippets
+- **Quotes**: Blockquotes
+- **Tasks**: Checkbox lists
+
+Enjoy writing!');
+
+-- Grant necessary permissions
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT ALL ON documents TO authenticated;
+GRANT ALL ON user_rooms TO authenticated;
+GRANT EXECUTE ON FUNCTION update_document_content_simple TO authenticated;
