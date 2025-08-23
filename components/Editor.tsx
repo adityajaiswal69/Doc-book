@@ -538,27 +538,29 @@ export default function Editor() {
 
   // Auto-resize textarea height based on content
   const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement) => {
+    // Only resize if the textarea is actually mounted and visible
+    if (!textarea || !textarea.isConnected) return;
+    
     // Reset height to auto first to get accurate scrollHeight
     textarea.style.height = 'auto';
     
-    // Get the exact content height without any padding calculations
+    // Get the exact content height
     const contentHeight = textarea.scrollHeight;
     
-    // Set height to exact content height with no minimum padding
-    const newHeight = Math.max(contentHeight, 0);
+    // Set height to content height with minimal constraints
+    const newHeight = Math.max(contentHeight, 24); // Small minimum height for cursor visibility
     textarea.style.height = `${newHeight}px`;
-    textarea.style.minHeight = `${newHeight}px`;
-    textarea.style.maxHeight = `${newHeight}px`;
     
-    // Ensure the container also adjusts smoothly
-    const container = textarea.closest('.block-container') as HTMLElement;
-    if (container) {
-      container.style.height = 'auto';
-    }
+    // Remove any conflicting styles that might prevent auto-height
+    textarea.style.minHeight = '';
+    textarea.style.maxHeight = '';
   }, []);
 
   // Debounced resize function for better performance
   const debouncedResize = useCallback((textarea: HTMLTextAreaElement) => {
+    // Only resize if the textarea is still valid
+    if (!textarea || !textarea.isConnected) return;
+    
     const blockId = textarea.dataset.blockId;
     if (blockId && resizeTimeoutsRef.current[blockId]) {
       clearTimeout(resizeTimeoutsRef.current[blockId]);
@@ -566,8 +568,11 @@ export default function Editor() {
     
     if (blockId) {
       resizeTimeoutsRef.current[blockId] = setTimeout(() => {
-        autoResizeTextarea(textarea);
-      }, 10);
+        // Check again before resizing to prevent errors
+        if (textarea && textarea.isConnected) {
+          autoResizeTextarea(textarea);
+        }
+      }, 50); // Increased delay to reduce aggressive resizing
     }
   }, [autoResizeTextarea]);
 
@@ -659,11 +664,9 @@ export default function Editor() {
         if (el) {
           blockRefs.current[block.id] = el;
           el.dataset.blockId = block.id;
-          // Auto-resize on initial render with no minimum height
-          setTimeout(() => {
-            autoResizeTextarea(el);
-            // No minimum height - let it be exactly the content height
-          }, 0);
+          
+          // Initialize auto-height immediately
+          autoResizeTextarea(el);
         }
       },
       value: block.content,
@@ -671,24 +674,21 @@ export default function Editor() {
         const newContent = e.target.value;
         handleBlockChange(block.id, newContent);
         handleSlashCommand(block.id, newContent);
-        // Use debounced resize for better performance
-        debouncedResize(e.target);
+        
+        // Always resize immediately for responsive feel
+        autoResizeTextarea(e.target);
       },
       onKeyDown: (e: React.KeyboardEvent) => handleBlockKeyDown(e, block.id),
       placeholder: `Type '/' for commands...`,
-      className: "w-full resize-none border-none outline-none bg-transparent text-white editor-textarea focus:outline-none focus:ring-0 transition-all duration-100",
-      style: {
-        fontSize: '16px',
-        lineHeight: '1.4',
-        padding: '0',
-        margin: '0',
-        caretColor: 'white',
-        caretShape: 'block' as const,
-        height: 'auto',
-        minHeight: '0',
-        maxHeight: 'none',
-        overflow: 'hidden'
-      },
+             className: "w-full resize-none border-none outline-none bg-transparent content-center text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden hover:bg-gray-800/30 rounded px-2 py-1",
+       style: {
+         fontSize: '16px',
+         lineHeight: '1.4',
+         padding: '0',
+         margin: '0',
+         caretColor: 'white',
+         caretShape: 'block' as const
+       },
       spellCheck: false,
       autoComplete: "off",
       autoCorrect: "off",
@@ -968,7 +968,7 @@ export default function Editor() {
           {/* Blocks */}
           <div className="space-y-1">
             {blocks.map((block, index) => (
-              <div key={block.id} className="block-container relative group py-0.5" data-type={block.type}>
+              <div key={block.id} className="relative group py-0.5 mb-2" data-type={block.type}>
                 {renderBlock(block)}
                 
                 {/* Delete button - visible on hover */}
@@ -984,7 +984,7 @@ export default function Editor() {
                       toast.error("Cannot delete the last block");
                     }
                   }}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1.5 rounded-md hover:bg-red-500/20 text-red-400 hover:text-red-300"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded-md hover:bg-red-500/20 text-red-400 hover:text-red-300"
                   title="Delete block"
                   disabled={blocks.length <= 1}
                 >
