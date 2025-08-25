@@ -12,6 +12,14 @@ import { toast } from "sonner";
 import { Block, BlockType, CommandItem } from "@/types/editor";
 
 export default function Editor() {
+  // Z-index hierarchy:
+  // z-0: Block type indicators and drag handles (lowest priority)
+  // z-10: Block content area (medium priority)  
+  // z-20: Three dots menu button (higher priority)
+  // z-30: Dropdown menu content (highest priority for block menus)
+  // z-40: Floating formatting toolbar (high priority for global UI)
+  // z-50: Command palette (highest priority for global UI)
+  
   const params = useParams();
   const documentId = params.id as string;
   const { user } = useAuth();
@@ -1224,13 +1232,13 @@ export default function Editor() {
                     onDragEnd={() => setDragOverBlockId(null)}
                   >
                     {/* Block type indicator */}
-                    <div className="absolute top-2 left-2 text-xs text-gray-500 font-mono bg-gray-800/50 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <div className="absolute top-2 left-2 text-xs text-gray-500 font-mono bg-gray-800/50 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-0">
                       {block.type.replace('-', ' ')}
                     </div>
                     
                     {/* Drag handle - visible on hover */}
                     <div 
-                      className="absolute left-8 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing p-2"
+                      className="absolute left-8 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing p-2 z-0"
                       draggable={true}
                       onDragStart={(e) => handleDragStart(e, block.id)}
                       title="Drag to reorder"
@@ -1243,7 +1251,7 @@ export default function Editor() {
                     </div>
                     
                     {/* Block content with proper padding */}
-                    <div className="ml-16 mr-12">
+                    <div className="ml-16 mr-12 relative z-10">
                       {renderBlock(block)}
                       
                       {/* Quick actions toolbar - visible on hover */}
@@ -1327,7 +1335,7 @@ export default function Editor() {
                     </div>
                     
                     {/* Three dots menu - visible on hover */}
-                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200" data-block-menu>
+                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20" data-block-menu>
                       <button
                         onClick={() => setOpenMenuBlockId(openMenuBlockId === block.id ? null : block.id)}
                         className="p-2 rounded-md hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
@@ -1338,7 +1346,7 @@ export default function Editor() {
                       
                       {/* Dropdown menu */}
                       {openMenuBlockId === block.id && (
-                        <div className="absolute right-0 top-full mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10">
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-30">
                           <div className="p-2 border-b border-gray-700">
                             <div className="text-xs text-gray-400 font-medium">Block Actions</div>
                           </div>
@@ -1578,7 +1586,7 @@ export default function Editor() {
       {/* Floating Formatting Toolbar */}
       {showFloatingToolbar && (
         <div 
-          className="fixed z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl backdrop-blur-sm"
+          className="fixed z-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl backdrop-blur-sm"
           style={{
             left: toolbarPosition.x,
             top: toolbarPosition.y,
