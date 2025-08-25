@@ -933,7 +933,7 @@ export default function Editor() {
   return (
     <div className="flex flex-col h-full relative">
       {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2">
@@ -1018,8 +1018,8 @@ export default function Editor() {
       </div>
 
       {/* Content editor */}
-      <div className="flex-1 px-6 lg:px-8 overflow-y-auto">
-        <div className="max-w-4xl mx-auto py-6">
+      <div className="flex-1 px-6 lg:px-8 overflow-y-auto min-h-0">
+        <div className="max-w-4xl mx-auto py-6 pb-20">
           {/* Document title */}
           <div className="text-center mb-6">
             <h1 className="text-4xl font-bold mb-3 text-white">

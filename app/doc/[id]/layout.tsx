@@ -10,7 +10,7 @@ export default function Layout({children, params}:{
   
     return (
       <RoomProvider roomId={id}>
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-screen">
           {children}
         </div>
       </RoomProvider>
