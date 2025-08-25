@@ -6,6 +6,8 @@ export interface Database {
           id: string
           title: string
           content: string
+          content_backup?: string
+          blocks_content?: any
           type: 'document' | 'folder'
           parent_id: string | null
           order_index: number
@@ -16,6 +18,8 @@ export interface Database {
           id?: string
           title: string
           content?: string
+          content_backup?: string
+          blocks_content?: any
           type?: 'document' | 'folder'
           parent_id?: string | null
           order_index?: number
@@ -26,6 +30,8 @@ export interface Database {
           id?: string
           title?: string
           content?: string
+          content_backup?: string
+          blocks_content?: any
           type?: 'document' | 'folder'
           parent_id?: string | null
           order_index?: number

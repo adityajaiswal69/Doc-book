@@ -156,7 +156,7 @@ export function useDocument(id: string) {
     fetchDocument()
   }, [fetchDocument, isInitialLoad])
 
-  const saveDocument = useCallback(async (updates: { title?: string; content?: string }) => {
+  const saveDocument = useCallback(async (updates: { title?: string; content?: string; blocks_content?: any }) => {
     if (!id || !user?.id) return
     
     try {

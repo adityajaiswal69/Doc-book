@@ -183,14 +183,17 @@ export async function getDocument(id: string, userId: string) {
   }
 }
 
-export async function updateDocument(id: string, updates: { title?: string; content?: string }, userId: string) {
+export async function updateDocument(id: string, updates: { title?: string; content?: string; blocks_content?: any }, userId: string) {
   try {
     const supabase = await createServerSupabaseClient()
     
     console.log('Updating document with ID:', id, 'for user:', userId)
-    console.log('Update type:', updates.title ? 'title' : updates.content ? 'content' : 'both')
+    console.log('Update type:', updates.title ? 'title' : updates.content ? 'content' : updates.blocks_content ? 'blocks' : 'both')
     if (updates.content) {
       console.log('Content length:', updates.content.length, 'characters')
+    }
+    if (updates.blocks_content) {
+      console.log('Blocks count:', Array.isArray(updates.blocks_content) ? updates.blocks_content.length : 'not array')
     }
 
     // First check if user has access to this document
@@ -239,6 +242,7 @@ export async function updateDocument(id: string, updates: { title?: string; cont
       id: document.id,
       titleLength: document.title?.length || 0,
       contentLength: document.content?.length || 0,
+      blocksCount: Array.isArray(document.blocks_content) ? document.blocks_content.length : 0,
       updatedAt: document.updated_at
     })
     

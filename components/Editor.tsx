@@ -9,25 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X, MoreHorizontal } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
-
-interface Block {
-  id: string;
-  type: string;
-  content: string;
-  metadata?: any;
-  listIndex?: number; // For numbered lists
-  parentListId?: string; // For nested lists
-}
-
-interface CommandItem {
-  id: string;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  shortcut?: string;
-  preview: React.ReactNode;
-  action: (content: string) => { newContent: string; newCursorPosition: number };
-}
+import { Block, BlockType, CommandItem } from "@/types/editor";
 
 export default function Editor() {
   const params = useParams();
@@ -242,32 +224,32 @@ export default function Editor() {
     {
       id: "image",
       title: "Image",
-      description: "Insert an image",
+      description: "Insert an image URL",
       icon: <Image className="h-4 w-4" />,
       preview: (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
           <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-          <div className="text-gray-400 text-sm">Image block</div>
+          <div className="text-gray-400 text-sm">Image URL</div>
         </div>
       ),
       action: (content) => ({
-        newContent: content,
+        newContent: content ,
         newCursorPosition: content.length
       })
     },
     {
       id: "video",
       title: "Video",
-      description: "Insert a video",
+      description: "Insert a video URL",
       icon: <Video className="h-4 w-4" />,
       preview: (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
           <Video className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-          <div className="text-gray-400 text-sm">Video block</div>
+          <div className="text-gray-400 text-sm">Video URL</div>
         </div>
       ),
       action: (content) => ({
-        newContent: content,
+        newContent: content   ,
         newCursorPosition: content.length
       })
     }
@@ -284,62 +266,123 @@ export default function Editor() {
     if (document && !titleChanged && !contentChanged) {
       setTitle(document.title || "");
       
-      // Parse content into blocks
-      const content = document.content || "";
-      if (content) {
-        const lines = content.split('\n');
-        const newBlocks: Block[] = [];
-        let currentBlock: Block | null = null;
-        
-        lines.forEach((line, index) => {
-          const trimmedLine = line.trim();
+      // Parse content into blocks - try JSON first, then fallback to plain text
+      let newBlocks: Block[] = [];
+      
+      // First try to load from blocks_content JSON
+      if (document.blocks_content && Array.isArray(document.blocks_content)) {
+        newBlocks = document.blocks_content.map((block: any, index: number) => {
+          const newBlock = {
+            id: block.id || `block-${index}`,
+            type: block.type as BlockType,
+            content: block.content || '',
+            metadata: block.metadata,
+            listIndex: block.listIndex,
+            parentListId: block.parentListId,
+            checked: block.checked,
+            orderIndex: block.orderIndex !== undefined ? block.orderIndex : index
+          };
           
-          if (trimmedLine.startsWith('# ')) {
-            if (currentBlock) newBlocks.push(currentBlock);
-            currentBlock = { id: `block-${index}`, type: 'heading-1', content: trimmedLine.substring(2) };
-          } else if (trimmedLine.startsWith('## ')) {
-            if (currentBlock) newBlocks.push(currentBlock);
-            currentBlock = { id: `block-${index}`, type: 'heading-2', content: trimmedLine.substring(3) };
-          } else if (trimmedLine.startsWith('### ')) {
-            if (currentBlock) newBlocks.push(currentBlock);
-            currentBlock = { id: `block-${index}`, type: 'heading-3', content: trimmedLine.substring(4) };
-          } else if (trimmedLine.startsWith('- ')) {
-            if (currentBlock) newBlocks.push(currentBlock);
-            currentBlock = { id: `block-${index}`, type: 'bulleted-list', content: trimmedLine.substring(2) };
-          } else if (trimmedLine.startsWith('1. ')) {
-            if (currentBlock) newBlocks.push(currentBlock);
-            currentBlock = { id: `block-${index}`, type: 'numbered-list', content: trimmedLine.substring(3) };
-          } else if (trimmedLine.match(/^- \[ \]/)) {
-            if (currentBlock) newBlocks.push(currentBlock);
-            currentBlock = { id: `block-${index}`, type: 'todo-list', content: trimmedLine.substring(6) };
-          } else if (trimmedLine.startsWith('> ')) {
-            if (currentBlock) newBlocks.push(currentBlock);
-            currentBlock = { id: `block-${index}`, type: 'quote', content: trimmedLine.substring(2) };
-          } else if (trimmedLine.startsWith('```')) {
-            if (currentBlock) newBlocks.push(currentBlock);
-            currentBlock = { id: `block-${index}`, type: 'code-block', content: '// Your code here' };
-          } else if (trimmedLine === '---') {
-            if (currentBlock) newBlocks.push(currentBlock);
-            currentBlock = { id: `block-${index}`, type: 'divider', content: '' };
-          } else if (trimmedLine === '') {
-            if (currentBlock) newBlocks.push(currentBlock);
-            currentBlock = { id: `block-${index}`, type: 'text', content: '' };
-          } else {
-            if (currentBlock && currentBlock.type === 'text') {
-              currentBlock.content += (currentBlock.content ? '\n' : '') + trimmedLine;
-            } else {
-              if (currentBlock) newBlocks.push(currentBlock);
-              currentBlock = { id: `block-${index}`, type: 'text', content: trimmedLine };
-            }
+          // Ensure metadata is properly set for image and video blocks
+          if (newBlock.type === 'image' && !newBlock.metadata) {
+            newBlock.metadata = {
+              url: newBlock.content,
+              type: 'image'
+            };
+          } else if (newBlock.type === 'video' && !newBlock.metadata) {
+            newBlock.metadata = {
+              url: newBlock.content,
+              type: 'video'
+            };
           }
+          
+          return newBlock;
         });
         
-        if (currentBlock) newBlocks.push(currentBlock);
-        setBlocks(newBlocks);
+        // Sort blocks by orderIndex to ensure proper order
+        newBlocks.sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
       } else {
-        // Create initial empty text block
-        setBlocks([{ id: 'block-0', type: 'text', content: '' }]);
+        // Fallback to parsing plain text content
+        const content = document.content || "";
+        if (content) {
+          const lines = content.split('\n');
+          let currentBlock: Block | null = null;
+          
+          lines.forEach((line, index) => {
+            const trimmedLine = line.trim();
+            
+            if (trimmedLine.startsWith('# ')) {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { id: `block-${index}`, type: 'heading-1' as BlockType, content: trimmedLine.substring(2), orderIndex: index };
+            } else if (trimmedLine.startsWith('## ')) {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { id: `block-${index}`, type: 'heading-2' as BlockType, content: trimmedLine.substring(3), orderIndex: index };
+            } else if (trimmedLine.startsWith('### ')) {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { id: `block-${index}`, type: 'heading-3' as BlockType, content: trimmedLine.substring(4), orderIndex: index };
+            } else if (trimmedLine.startsWith('- ')) {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { id: `block-${index}`, type: 'bulleted-list' as BlockType, content: trimmedLine.substring(2), orderIndex: index };
+            } else if (trimmedLine.startsWith('1. ')) {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { id: `block-${index}`, type: 'numbered-list' as BlockType, content: trimmedLine.substring(3), orderIndex: index };
+            } else if (trimmedLine.match(/^- \[ \]/)) {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { id: `block-${index}`, type: 'todo-list' as BlockType, content: trimmedLine.substring(6), orderIndex: index };
+            } else if (trimmedLine.startsWith('> ')) {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { id: `block-${index}`, type: 'quote' as BlockType, content: trimmedLine.substring(2), orderIndex: index };
+            } else if (trimmedLine.startsWith('```')) {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { id: `block-${index}`, type: 'code-block' as BlockType, content: '// Your code here', orderIndex: index };
+            } else if (trimmedLine === '---') {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { id: `block-${index}`, type: 'divider' as BlockType, content: '', orderIndex: index };
+            } else if (trimmedLine.startsWith('http') && (trimmedLine.includes('.jpg') || trimmedLine.includes('.jpeg') || trimmedLine.includes('.png') || trimmedLine.includes('.gif') || trimmedLine.includes('.webp'))) {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { 
+                id: `block-${index}`, 
+                type: 'image' as BlockType, 
+                content: trimmedLine,
+                orderIndex: index,
+                metadata: {
+                  url: trimmedLine,
+                  type: 'image'
+                }
+              };
+            } else if (trimmedLine.startsWith('http') && (trimmedLine.includes('.mp4') || trimmedLine.includes('.webm') || trimmedLine.includes('.avi') || trimmedLine.includes('.mov'))) {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { 
+                id: `block-${index}`, 
+                type: 'video' as BlockType, 
+                content: trimmedLine,
+                orderIndex: index,
+                metadata: {
+                  url: trimmedLine,
+                  type: 'video'
+                }
+              };
+            } else if (trimmedLine === '') {
+              if (currentBlock) newBlocks.push(currentBlock);
+              currentBlock = { id: `block-${index}`, type: 'text' as BlockType, content: '', orderIndex: index };
+            } else {
+              if (currentBlock && currentBlock.type === 'text') {
+                currentBlock.content += (currentBlock.content ? '\n' : '') + trimmedLine;
+              } else {
+                if (currentBlock) newBlocks.push(currentBlock);
+                currentBlock = { id: `block-${index}`, type: 'text' as BlockType, content: trimmedLine, orderIndex: index };
+              }
+            }
+          });
+          
+          if (currentBlock) newBlocks.push(currentBlock);
+        } else {
+          // Create initial empty text block
+          newBlocks = [{ id: 'block-0', type: 'text' as BlockType, content: '' }];
+        }
       }
+      
+      setBlocks(newBlocks);
       
       setTitleChanged(false);
       setContentChanged(false);
@@ -395,12 +438,30 @@ export default function Editor() {
   }, [saveDocument]);
 
   // Handle block content changes
-  const handleBlockChange = useCallback(async (blockId: string, newContent: string, newType?: string) => {
-    setBlocks(prev => prev.map(block => 
-      block.id === blockId 
-        ? { ...block, content: newContent, type: newType || block.type }
-        : block
-    ));
+  const handleBlockChange = useCallback(async (blockId: string, newContent: string, newType?: BlockType) => {
+    setBlocks(prev => prev.map(block => {
+      if (block.id === blockId) {
+        const updatedBlock = { ...block, content: newContent, type: newType || block.type };
+        
+        // Update metadata for image and video blocks when content changes
+        if (updatedBlock.type === 'image') {
+          updatedBlock.metadata = {
+            ...updatedBlock.metadata,
+            url: newContent,
+            type: 'image'
+          };
+        } else if (updatedBlock.type === 'video') {
+          updatedBlock.metadata = {
+            ...updatedBlock.metadata,
+            url: newContent,
+            type: 'video'
+          };
+        }
+        
+        return updatedBlock;
+      }
+      return block;
+    }));
     setContentChanged(true);
     
     // Auto-save
@@ -413,22 +474,9 @@ export default function Editor() {
       
       try {
         isSavingContentRef.current = true;
-        const content = blocks.map(block => {
-          switch (block.type) {
-            case 'heading-1': return `# ${block.content}`;
-            case 'heading-2': return `## ${block.content}`;
-            case 'heading-3': return `### ${block.content}`;
-            case 'bulleted-list': return `- ${block.content}`;
-            case 'numbered-list': return `1. ${block.content}`;
-            case 'todo-list': return `- [ ] ${block.content}`;
-            case 'quote': return `> ${block.content}`;
-            case 'code-block': return `\`\`\`\n${block.content}\n\`\`\``;
-            case 'divider': return `---`;
-            default: return block.content;
-          }
-        }).join('\n');
         
-        await saveDocument({ content });
+        // Save blocks as JSON for better structure preservation
+        await saveDocument({ blocks_content: blocks });
         setContentChanged(false);
       } catch (error) {
         console.error('Failed to save content:', error);
@@ -470,11 +518,33 @@ export default function Editor() {
     const result = command.action(contentWithoutSlash);
     
     setBlocks(prev => {
-      const updatedBlocks = prev.map(block => 
-        block.id === activeBlockId 
-          ? { ...block, content: result.newContent, type: command.id }
-          : block
-      );
+      const updatedBlocks = prev.map(block => {
+        if (block.id === activeBlockId) {
+          const updatedBlock = { 
+            ...block, 
+            content: result.newContent, 
+            type: command.id as BlockType 
+          };
+          
+          // Add metadata for image and video blocks
+          if (command.id === 'image') {
+            updatedBlock.metadata = {
+              ...updatedBlock.metadata,
+              url: result.newContent,
+              type: 'image'
+            };
+          } else if (command.id === 'video') {
+            updatedBlock.metadata = {
+              ...updatedBlock.metadata,
+              url: result.newContent,
+              type: 'video'
+            };
+          }
+          
+          return updatedBlock;
+        }
+        return block;
+      });
       
       // Update list indices if the new type is a list
       if (command.id === 'numbered-list' || command.id === 'bulleted-list' || command.id === 'todo-list') {
@@ -540,14 +610,34 @@ export default function Editor() {
 
   // Add new block
   const addBlock = useCallback((afterBlockId: string) => {
-    const newBlock: Block = { id: `block-${Date.now()}`, type: 'text', content: '' };
+    const newBlock: Block = { id: `block-${Date.now()}`, type: 'text' as BlockType, content: '' };
     setBlocks(prev => {
       const index = prev.findIndex(b => b.id === afterBlockId);
       const newBlocks = [...prev];
       newBlocks.splice(index + 1, 0, newBlock);
       
+      // Update order indices for all blocks
+      const updatedBlocks = newBlocks.map((block, idx) => ({
+        ...block,
+        orderIndex: idx
+      }));
+      
       // Update list indices if needed
-      return updateListIndices(newBlocks);
+      const finalBlocks = updateListIndices(updatedBlocks);
+      
+      // Save the updated blocks to the backend
+      (async () => {
+        try {
+          setContentChanged(true);
+          await saveDocument({ blocks_content: finalBlocks });
+          setContentChanged(false);
+        } catch (error) {
+          console.error('Failed to save new block:', error);
+          setContentChanged(true);
+        }
+      })();
+      
+      return finalBlocks;
     });
     
     // Focus new block
@@ -557,7 +647,7 @@ export default function Editor() {
         blockElement.focus();
       }
     }, 10);
-  }, [updateListIndices]);
+  }, [updateListIndices, saveDocument]);
 
   // Drag and drop handlers
   const handleDragStart = useCallback((e: React.DragEvent, blockId: string) => {
@@ -577,7 +667,7 @@ export default function Editor() {
     setDragOverBlockId(null);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent, targetBlockId: string) => {
+  const handleDrop = useCallback(async (e: React.DragEvent, targetBlockId: string) => {
     e.preventDefault();
     if (!draggedBlockId || draggedBlockId === targetBlockId) return;
 
@@ -591,12 +681,34 @@ export default function Editor() {
       const [draggedBlock] = newBlocks.splice(draggedIndex, 1);
       newBlocks.splice(targetIndex, 0, draggedBlock);
       
-      return updateListIndices(newBlocks);
+      // Update order indices for all blocks after drag and drop
+      const updatedBlocks = newBlocks.map((block, idx) => ({
+        ...block,
+        orderIndex: idx
+      }));
+      
+      const finalBlocks = updateListIndices(updatedBlocks);
+      
+      // Save the updated blocks to the backend immediately
+      (async () => {
+        try {
+          setContentChanged(true);
+          await saveDocument({ blocks_content: finalBlocks });
+          setContentChanged(false);
+          toast.success('Block order updated');
+        } catch (error) {
+          console.error('Failed to save block order:', error);
+          toast.error('Failed to save block order');
+          setContentChanged(true);
+        }
+      })();
+      
+      return finalBlocks;
     });
     
     setDraggedBlockId(null);
     setDragOverBlockId(null);
-  }, [draggedBlockId, updateListIndices]);
+  }, [draggedBlockId, updateListIndices, saveDocument]);
 
   // Auto-resize textarea height based on content
   const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement) => {
@@ -652,10 +764,34 @@ export default function Editor() {
       const block = blocks.find(b => b.id === blockId);
       if (block && block.content === '' && blocks.length > 1) {
         e.preventDefault();
-        setBlocks(prev => prev.filter(b => b.id !== blockId));
+        setBlocks(prev => {
+          const filteredBlocks = prev.filter(b => b.id !== blockId);
+          
+          // Update order indices for remaining blocks
+          const updatedBlocks = filteredBlocks.map((block, idx) => ({
+            ...block,
+            orderIndex: idx
+          }));
+          
+          const finalBlocks = updateListIndices(updatedBlocks);
+          
+          // Save the updated blocks to the backend
+          (async () => {
+            try {
+              setContentChanged(true);
+              await saveDocument({ blocks_content: finalBlocks });
+              setContentChanged(false);
+            } catch (error) {
+              console.error('Failed to save after block deletion:', error);
+              setContentChanged(true);
+            }
+          })();
+          
+          return finalBlocks;
+        });
       }
     }
-  }, [blocks, addBlock]);
+  }, [blocks, addBlock, updateListIndices, saveDocument]);
 
   // Render block based on type
   const renderBlock = (block: Block) => {
@@ -803,26 +939,58 @@ export default function Editor() {
         );
       case 'image':
         return (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
-            <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Image className="h-5 w-5 text-gray-400" />
+              <span className="text-sm text-gray-400">Image URL:</span>
+            </div>
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, textAlign: 'center', lineHeight: '1.6' }}
-              placeholder="Image description or URL"
-              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
+              style={{ ...commonProps.style, fontFamily: 'monospace', fontSize: '14px', lineHeight: '1.4' }}
+              placeholder="https://example.com/image.jpg"
+              className="w-full resize-none border-none outline-none bg-transparent text-blue-400 focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
             />
+            {block.content && block.content.startsWith('http') && (
+              <div className="mt-3 p-2 bg-gray-900 rounded border border-gray-600">
+                <img 
+                  src={block.content} 
+                  alt="Preview" 
+                  className="max-w-full h-auto max-h-48 mx-auto rounded"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
           </div>
         );
       case 'video':
         return (
-          <div className="bg-gray-700 rounded-lg p-4 text-center">
-            <Video className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Video className="h-5 w-5 text-gray-400" />
+              <span className="text-sm text-gray-400">Video URL:</span>
+            </div>
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, textAlign: 'center', lineHeight: '1.6' }}
-              placeholder="Video description or URL"
-              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
+              style={{ ...commonProps.style, fontFamily: 'monospace', fontSize: '14px', lineHeight: '1.4' }}
+              placeholder="https://example.com/video.mp4"
+              className="w-full resize-none border-none outline-none bg-transparent text-blue-400 focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
             />
+            {block.content && block.content.startsWith('http') && (
+              <div className="mt-3 p-2 bg-gray-900 rounded border border-gray-600">
+                <video 
+                  src={block.content} 
+                  controls
+                  className="max-w-full h-auto max-h-48 mx-auto rounded"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            )}
           </div>
         );
       default:
@@ -984,22 +1152,7 @@ export default function Editor() {
               className="h-8"
               onClick={async () => {
                 try {
-                  const content = blocks.map(block => {
-                    switch (block.type) {
-                      case 'heading-1': return `# ${block.content}`;
-                      case 'heading-2': return `## ${block.content}`;
-                      case 'heading-3': return `### ${block.content}`;
-                      case 'bulleted-list': return `- ${block.content}`;
-                      case 'numbered-list': return `1. ${block.content}`;
-                      case 'todo-list': return `- [ ] ${block.content}`;
-                      case 'quote': return `> ${block.content}`;
-                      case 'code-block': return `\`\`\`\n${block.content}\n\`\`\``;
-                      case 'divider': return `---`;
-                      default: return block.content;
-                    }
-                  }).join('\n');
-                  
-                  await saveDocument({ title, content });
+                  await saveDocument({ title, blocks_content: blocks });
                   setTitleChanged(false);
                   setContentChanged(false);
                   toast.success('Document saved!');
@@ -1097,12 +1250,33 @@ export default function Editor() {
                       <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         <button
                           onClick={() => {
-                            const newBlock = { id: `block-${Date.now()}`, type: 'text', content: '' };
+                            const newBlock: Block = { id: `block-${Date.now()}`, type: 'text' as BlockType, content: '' };
                             setBlocks(prev => {
                               const index = prev.findIndex(b => b.id === block.id);
                               const newBlocks = [...prev];
                               newBlocks.splice(index + 1, 0, newBlock);
-                              return updateListIndices(newBlocks);
+                              
+                              // Update order indices for all blocks
+                              const updatedBlocks = newBlocks.map((block, idx) => ({
+                                ...block,
+                                orderIndex: idx
+                              }));
+                              
+                              const finalBlocks = updateListIndices(updatedBlocks);
+                              
+                              // Save the updated blocks to the backend
+                              (async () => {
+                                try {
+                                  setContentChanged(true);
+                                  await saveDocument({ blocks_content: finalBlocks });
+                                  setContentChanged(false);
+                                } catch (error) {
+                                  console.error('Failed to save after adding block:', error);
+                                  setContentChanged(true);
+                                }
+                              })();
+                              
+                              return finalBlocks;
                             });
                             toast.success("New block added");
                           }}
@@ -1114,12 +1288,33 @@ export default function Editor() {
                         
                         <button
                           onClick={() => {
-                            const newBlock = { id: `block-${Date.now()}`, type: block.type, content: '' };
+                            const newBlock: Block = { id: `block-${Date.now()}`, type: block.type, content: '' };
                             setBlocks(prev => {
                               const index = prev.findIndex(b => b.id === block.id);
                               const newBlocks = [...prev];
                               newBlocks.splice(index + 1, 0, newBlock);
-                              return updateListIndices(newBlocks);
+                              
+                              // Update order indices for all blocks
+                              const updatedBlocks = newBlocks.map((block, idx) => ({
+                                ...block,
+                                orderIndex: idx
+                              }));
+                              
+                              const finalBlocks = updateListIndices(updatedBlocks);
+                              
+                              // Save the updated blocks to the backend
+                              (async () => {
+                                try {
+                                  setContentChanged(true);
+                                  await saveDocument({ blocks_content: finalBlocks });
+                                  setContentChanged(false);
+                                } catch (error) {
+                                  console.error('Failed to save after duplicating block:', error);
+                                  setContentChanged(true);
+                                }
+                              })();
+                              
+                              return finalBlocks;
                             });
                             toast.success("Block duplicated");
                           }}
@@ -1152,11 +1347,11 @@ export default function Editor() {
                           <div className="p-2 border-b border-gray-700">
                             <div className="text-xs text-gray-400 font-medium mb-2">Change Type</div>
                             <div className="grid grid-cols-2 gap-1">
-                              {['text', 'heading-1', 'heading-2', 'heading-3', 'bulleted-list', 'numbered-list', 'todo-list', 'quote', 'code-block'].map((type) => (
+                              {(['text', 'heading-1', 'heading-2', 'heading-3', 'bulleted-list', 'numbered-list', 'todo-list', 'quote', 'code-block'] as BlockType[]).map((type) => (
                                 <button
                                   key={type}
                                   onClick={() => {
-                                    handleBlockChange(block.id, block.content, type);
+                                    handleBlockChange(block.id, block.content, type as BlockType);
                                     setOpenMenuBlockId(null);
                                     toast.success(`Changed to ${type.replace('-', ' ')}`);
                                   }}
@@ -1172,29 +1367,71 @@ export default function Editor() {
                             </div>
                           </div>
                           
-                          <button
-                            onClick={() => {
-                              const newBlock = { id: `block-${Date.now()}`, type: block.type, content: '' };
-                              setBlocks(prev => {
-                                const index = prev.findIndex(b => b.id === block.id);
-                                const newBlocks = [...prev];
-                                newBlocks.splice(index + 1, 0, newBlock);
-                                return updateListIndices(newBlocks);
-                              });
-                              setOpenMenuBlockId(null);
-                              toast.success("Block duplicated");
-                            }}
-                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
-                          >
-                            📋 Duplicate block
-                          </button>
+                                                      <button
+                              onClick={() => {
+                                const newBlock: Block = { id: `block-${Date.now()}`, type: block.type, content: '' };
+                                setBlocks(prev => {
+                                  const index = prev.findIndex(b => b.id === block.id);
+                                  const newBlocks = [...prev];
+                                  newBlocks.splice(index + 1, 0, newBlock);
+                                  
+                                  // Update order indices for all blocks
+                                  const updatedBlocks = newBlocks.map((block, idx) => ({
+                                    ...block,
+                                    orderIndex: idx
+                                  }));
+                                  
+                                  const finalBlocks = updateListIndices(updatedBlocks);
+                                  
+                                  // Save the updated blocks to the backend
+                                  (async () => {
+                                    try {
+                                      setContentChanged(true);
+                                      await saveDocument({ blocks_content: finalBlocks });
+                                      setContentChanged(false);
+                                    } catch (error) {
+                                      console.error('Failed to save after block duplication:', error);
+                                      setContentChanged(true);
+                                    }
+                                  })();
+                                  
+                                  return finalBlocks;
+                                });
+                                setOpenMenuBlockId(null);
+                                toast.success("Block duplicated");
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                            >
+                              📋 Duplicate block
+                            </button>
                           
                           <button
                             onClick={() => {
                               if (blocks.length > 1) {
                                 setBlocks(prev => {
                                   const filteredBlocks = prev.filter(b => b.id !== block.id);
-                                  return updateListIndices(filteredBlocks);
+                                  
+                                  // Update order indices for remaining blocks
+                                  const updatedBlocks = filteredBlocks.map((block, idx) => ({
+                                    ...block,
+                                    orderIndex: idx
+                                  }));
+                                  
+                                  const finalBlocks = updateListIndices(updatedBlocks);
+                                  
+                                  // Save the updated blocks to the backend
+                                  (async () => {
+                                    try {
+                                      setContentChanged(true);
+                                      await saveDocument({ blocks_content: finalBlocks });
+                                      setContentChanged(false);
+                                    } catch (error) {
+                                      console.error('Failed to save after block deletion:', error);
+                                      setContentChanged(true);
+                                    }
+                                  })();
+                                  
+                                  return finalBlocks;
                                 });
                                 toast.success("Block deleted");
                               } else {
@@ -1220,7 +1457,27 @@ export default function Editor() {
            <div className="mt-6 text-center">
             <Button
               variant="ghost"
-              onClick={() => addBlock(blocks[blocks.length - 1]?.id || '')}
+              onClick={() => {
+                if (blocks.length > 0) {
+                  addBlock(blocks[blocks.length - 1]?.id || '');
+                } else {
+                  // If no blocks exist, create the first block
+                  const newBlock: Block = { id: `block-${Date.now()}`, type: 'text' as BlockType, content: '', orderIndex: 0 };
+                  setBlocks([newBlock]);
+                  
+                  // Save the new block to the backend
+                  (async () => {
+                    try {
+                      setContentChanged(true);
+                      await saveDocument({ blocks_content: [newBlock] });
+                      setContentChanged(false);
+                    } catch (error) {
+                      console.error('Failed to save first block:', error);
+                      setContentChanged(true);
+                    }
+                  })();
+                }
+              }}
               className="text-gray-400 hover:text-white"
             >
               + Add new block
