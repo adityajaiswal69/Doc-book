@@ -191,6 +191,48 @@ export default function AppSidebar() {
     }
   };
 
+  const handleShareDocument = async (docId: string, scope: 'document' | 'folder') => {
+    if (!user?.id) {
+      toast.error('Please sign in to share documents');
+      return;
+    }
+
+    try {
+      const { createPublicShare } = await import('@/actions/actions');
+      const result = await createPublicShare(docId, user.id, scope);
+      
+      // Refresh documents to show updated sharing status
+      refreshDocuments();
+      
+      // Copy share link to clipboard
+      const shareUrl = `${window.location.origin}/share/${result.shareId}`;
+      await navigator.clipboard.writeText(shareUrl);
+      
+      toast.success(`Document shared successfully! Share link copied to clipboard.`);
+    } catch (error) {
+      toast.error(`Failed to share document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleRevokeShare = async (docId: string) => {
+    if (!user?.id) {
+      toast.error('Please sign in to manage shares');
+      return;
+    }
+
+    try {
+      const { revokePublicShare } = await import('@/actions/actions');
+      await revokePublicShare(docId, user.id);
+      
+      // Refresh documents to show updated sharing status
+      refreshDocuments();
+      
+      toast.success('Document sharing revoked successfully');
+    } catch (error) {
+      toast.error(`Failed to revoke share: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const sidebarContent = (
     <div className="bg-background border-r flex flex-col h-full w-64">
       {/* User Profile Header */}
@@ -309,6 +351,8 @@ export default function AppSidebar() {
               onDeleteDocument={handleDeleteDocument}
               onRenameDocument={handleRenameDocument}
               onMoveDocument={handleMoveDocument}
+              onShareDocument={handleShareDocument}
+              onRevokeShare={handleRevokeShare}
               currentDocumentId={currentDocumentId}
             />
           )}

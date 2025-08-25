@@ -1088,3 +1088,214 @@ export async function cleanupOrphanedImages(userId: string) {
     throw error
   }
 }
+
+// Public sharing functions
+export async function createPublicShare(documentId: string, userId: string, shareScope: 'document' | 'folder' = 'document') {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Creating public share for document:', documentId, 'user:', userId, 'scope:', shareScope)
+
+    // Check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', documentId)
+      throw new Error("Access denied to this document")
+    }
+
+    // Check if user is owner (only owners can share)
+    if (userRoom.role !== 'owner') {
+      throw new Error("Only document owners can share documents")
+    }
+
+    // Create the public share using the database function
+    const { data: shareResult, error: shareError } = await supabase
+      .rpc('create_public_share', {
+        p_document_id: documentId,
+        p_share_scope: shareScope
+      })
+
+    if (shareError) {
+      console.error('Error creating public share:', shareError)
+      throw new Error(`Failed to create public share: ${shareError.message}`)
+    }
+
+    console.log('Public share created successfully:', shareResult)
+    return { 
+      success: true, 
+      shareId: shareResult.share_id,
+      shareScope: shareResult.share_scope,
+      sharedAt: shareResult.shared_at
+    }
+  } catch (error) {
+    console.error('Error in createPublicShare:', error)
+    throw error
+  }
+}
+
+export async function revokePublicShare(documentId: string, userId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Revoking public share for document:', documentId, 'user:', userId)
+
+    // Check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', documentId)
+      throw new Error("Access denied to this document")
+    }
+
+    // Check if user is owner (only owners can revoke)
+    if (userRoom.role !== 'owner') {
+      throw new Error("Only document owners can revoke shares")
+    }
+
+    // Revoke the public share using the database function
+    const { data: revokeResult, error: revokeError } = await supabase
+      .rpc('revoke_public_share', {
+        p_document_id: documentId
+      })
+
+    if (revokeError) {
+      console.error('Error revoking public share:', revokeError)
+      throw new Error(`Failed to revoke public share: ${revokeError.message}`)
+    }
+
+    console.log('Public share revoked successfully')
+    return { success: true, message: 'Public share revoked successfully' }
+  } catch (error) {
+    console.error('Error in revokePublicShare:', error)
+    throw error
+  }
+}
+
+export async function getSharedDocument(shareId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Getting shared document for share ID:', shareId)
+
+    // Get the shared document using the database function
+    const { data: shareResult, error: shareError } = await supabase
+      .rpc('get_shared_document', {
+        p_share_id: shareId
+      })
+
+    if (shareError) {
+      console.error('Error getting shared document:', shareError)
+      throw new Error(`Failed to get shared document: ${shareError.message}`)
+    }
+
+    console.log('Shared document retrieved successfully')
+    return { 
+      success: true, 
+      document: shareResult.document,
+      share: shareResult.share,
+      children: shareResult.children || []
+    }
+  } catch (error) {
+    console.error('Error in getSharedDocument:', error)
+    throw error
+  }
+}
+
+export async function getSharedFolderContents(folderId: string, shareId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Getting shared folder contents for folder ID:', folderId)
+
+    // First verify that this folder is part of a shared folder
+    const { data: shareRecord, error: shareError } = await supabase
+      .from('public_shares')
+      .select('*')
+      .eq('share_id', shareId)
+      .single()
+
+    if (shareError || !shareRecord) {
+      throw new Error('Share not found or invalid')
+    }
+
+    // Get the shared parent folder
+    const { data: parentFolder, error: parentError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', shareRecord.document_id)
+      .single()
+
+    if (parentError || !parentFolder) {
+      throw new Error('Parent folder not found')
+    }
+
+    // Check if the requested folder is a descendant of the shared folder
+    const { data: folderPath, error: pathError } = await supabase
+      .from('documents')
+      .select('id, parent_id')
+      .eq('id', folderId)
+
+    if (pathError || !folderPath) {
+      throw new Error('Folder not found')
+    }
+
+    // Get all children of the requested folder
+    const { data: children, error: childrenError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('parent_id', folderId)
+      .order('order_index')
+
+    if (childrenError) {
+      throw new Error(`Failed to get folder contents: ${childrenError.message}`)
+    }
+
+    return { 
+      success: true, 
+      folder: folderPath,
+      children: children || []
+    }
+  } catch (error) {
+    console.error('Error in getSharedFolderContents:', error)
+    throw error
+  }
+}
+
+export async function getUserSharedDocuments(userId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Getting shared documents for user:', userId)
+
+    // Get all shared documents for the user using the database function
+    const { data: sharedResult, error: sharedError } = await supabase
+      .rpc('get_user_shared_documents', {
+        p_user_id: userId
+      })
+
+    if (sharedError) {
+      console.error('Error getting user shared documents:', sharedError)
+      throw new Error(`Failed to get shared documents: ${sharedError.message}`)
+    }
+
+    console.log('User shared documents retrieved successfully')
+    return { 
+      success: true, 
+      sharedDocuments: sharedResult.shared_documents || []
+    }
+  } catch (error) {
+    console.error('Error in getUserSharedDocuments:', error)
+    throw error
+  }
+}

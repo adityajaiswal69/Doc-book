@@ -13,6 +13,10 @@ export interface Database {
           order_index: number
           created_at: string
           updated_at: string
+          is_shared?: boolean
+          share_id?: string
+          shared_at?: string
+          share_scope?: 'document' | 'folder'
         }
         Insert: {
           id?: string
@@ -25,6 +29,10 @@ export interface Database {
           order_index?: number
           created_at?: string
           updated_at?: string
+          is_shared?: boolean
+          share_id?: string
+          shared_at?: string
+          share_scope?: 'document' | 'folder'
         }
         Update: {
           id?: string
@@ -37,6 +45,42 @@ export interface Database {
           order_index?: number
           created_at?: string
           updated_at?: string
+          is_shared?: boolean
+          share_id?: string
+          shared_at?: string
+          share_scope?: 'document' | 'folder'
+        }
+      }
+      public_shares: {
+        Row: {
+          id: string
+          document_id: string
+          share_id: string
+          share_scope: 'document' | 'folder'
+          created_at: string
+          expires_at?: string
+          view_count: number
+          last_viewed_at?: string
+        }
+        Insert: {
+          id?: string
+          document_id: string
+          share_id: string
+          share_scope?: 'document' | 'folder'
+          created_at?: string
+          expires_at?: string
+          view_count?: number
+          last_viewed_at?: string
+        }
+        Update: {
+          id?: string
+          document_id?: string
+          share_id?: string
+          share_scope?: 'document' | 'folder'
+          created_at?: string
+          expires_at?: string
+          view_count?: number
+          last_viewed_at?: string
         }
       }
       user_rooms: {
@@ -89,4 +133,26 @@ export interface DocumentNode {
   order_index: number
   children?: DocumentNode[]
   isExpanded?: boolean
+  is_shared?: boolean
+  share_id?: string
+  shared_at?: string
+  share_scope?: 'document' | 'folder'
+}
+
+// Types for public sharing
+export interface PublicShare {
+  id: string
+  document_id: string
+  share_id: string
+  share_scope: 'document' | 'folder'
+  created_at: string
+  expires_at?: string
+  view_count: number
+  last_viewed_at?: string
+}
+
+export interface SharedDocument {
+  document: Document
+  share: PublicShare
+  children?: Document[]
 }

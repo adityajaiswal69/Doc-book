@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "migrate:hierarchical": "node run-hierarchical-migration.js",
+    "migrate:sharing": "node run-public-sharing-migration.js",
+    "test:sharing": "node test-public-sharing.js",
     "test:hierarchical": "node test-hierarchical.js",
     "test:dragdrop": "node test-drag-drop.js"
   },
@@ -31,6 +33,7 @@
     "@supabase/supabase-js": "^2.39.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "dotenv": "^17.2.1",
     "framer-motion": "^11.15.0",
     "lucide-react": "^0.468.0",

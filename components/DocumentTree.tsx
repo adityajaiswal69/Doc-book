@@ -13,7 +13,10 @@ import {
   Edit3,
   Trash2,
   FolderPlus,
-  GripVertical
+  GripVertical,
+  Share2,
+  Link,
+  Eye
 } from "lucide-react";
 import { DocumentNode } from "@/types/database";
 import { useRouter } from "next/navigation";
@@ -26,6 +29,8 @@ interface DocumentTreeProps {
   onDeleteDocument: (id: string, title: string) => void;
   onRenameDocument: (id: string, newTitle: string) => void;
   onMoveDocument?: (docId: string, newParentId: string | null) => void;
+  onShareDocument?: (id: string, scope: 'document' | 'folder') => void;
+  onRevokeShare?: (id: string) => void;
   currentDocumentId?: string;
 }
 
@@ -36,6 +41,8 @@ export default function DocumentTree({
   onDeleteDocument,
   onRenameDocument,
   onMoveDocument,
+  onShareDocument,
+  onRevokeShare,
   currentDocumentId
 }: DocumentTreeProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -246,11 +253,16 @@ export default function DocumentTree({
           )}
 
           {/* Icon */}
-          {doc.type === 'folder' ? (
-            <Folder className="h-4 w-4 text-blue-500" />
-          ) : (
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          )}
+          <div className="relative">
+            {doc.type === 'folder' ? (
+              <Folder className="h-4 w-4 text-blue-500" />
+            ) : (
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            )}
+            {doc.is_shared && (
+              <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white dark:border-gray-800" title="Publicly shared" />
+            )}
+          </div>
 
           {/* Title or Edit Input */}
           {isEditing ? (
@@ -308,6 +320,38 @@ export default function DocumentTree({
             >
               <Edit3 className="h-3 w-3" />
             </Button>
+            {/* Sharing buttons */}
+            {onShareDocument && onRevokeShare && (
+              <>
+                {doc.is_shared ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRevokeShare(doc.id);
+                    }}
+                    className="h-6 w-6 p-0 hover:bg-accent text-orange-500 hover:text-orange-700"
+                    title="Stop sharing"
+                  >
+                    <Eye className="h-3 w-3" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShareDocument(doc.id, doc.type === 'folder' ? 'folder' : 'document');
+                    }}
+                    className="h-6 w-6 p-0 hover:bg-accent"
+                    title="Share publicly"
+                  >
+                    <Share2 className="h-3 w-3" />
+                  </Button>
+                )}
+              </>
+            )}
             <Button
               variant="ghost"
               size="sm"

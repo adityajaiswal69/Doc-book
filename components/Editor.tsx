@@ -12,7 +12,19 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
 import { Block, BlockType, CommandItem } from "@/types/editor";
 
-export default function Editor() {
+interface EditorProps {
+  documentId?: string;
+  initialContent?: string;
+  initialBlocksContent?: any;
+  isReadOnly?: boolean;
+}
+
+export default function Editor({ 
+  documentId: propDocumentId, 
+  initialContent, 
+  initialBlocksContent, 
+  isReadOnly = false 
+}: EditorProps = {}) {
   // Z-index hierarchy:
   // z-0: Block type indicators and drag handles (lowest priority)
   // z-10: Block content area (medium priority)  
@@ -22,7 +34,8 @@ export default function Editor() {
   // z-50: Command palette (highest priority for global UI)
   
   const params = useParams();
-  const documentId = params.id as string;
+  const routeDocumentId = params.id as string;
+  const documentId = propDocumentId || routeDocumentId;
   const { user } = useAuth();
   const { document, loading, error, saving, saveDocument } = useDocument(documentId);
   
@@ -447,6 +460,120 @@ export default function Editor() {
     };
   }, []);
 
+  // Handle initial content for read-only mode
+  useEffect(() => {
+    if (isReadOnly && (initialContent || initialBlocksContent)) {
+      // Parse initial content into blocks
+      let newBlocks: Block[] = [];
+      
+      if (initialBlocksContent && Array.isArray(initialBlocksContent)) {
+        // Use provided blocks content
+        newBlocks = initialBlocksContent.map((block: any, index: number) => ({
+          id: block.id || `block-${index}`,
+          type: block.type as BlockType,
+          content: block.content || '',
+          metadata: block.metadata,
+          listIndex: block.listIndex,
+          parentListId: block.parentListId,
+          checked: block.checked,
+          orderIndex: block.orderIndex !== undefined ? block.orderIndex : index
+        }));
+      } else if (initialContent) {
+        // Parse plain text content
+        const lines = initialContent.split('\n');
+        lines.forEach((line, index) => {
+          const trimmedLine = line.trim();
+          
+          if (trimmedLine.startsWith('# ')) {
+            newBlocks.push({ 
+              id: `block-${index}`, 
+              type: 'heading-1' as BlockType, 
+              content: trimmedLine.substring(2), 
+              orderIndex: index 
+            });
+          } else if (trimmedLine.startsWith('## ')) {
+            newBlocks.push({ 
+              id: `block-${index}`, 
+              type: 'heading-2' as BlockType, 
+              content: trimmedLine.substring(3), 
+              orderIndex: index 
+            });
+          } else if (trimmedLine.startsWith('### ')) {
+            newBlocks.push({ 
+              id: `block-${index}`, 
+              type: 'heading-3' as BlockType, 
+              content: trimmedLine.substring(4), 
+              orderIndex: index 
+            });
+          } else if (trimmedLine.startsWith('- ')) {
+            newBlocks.push({ 
+              id: `block-${index}`, 
+              type: 'bulleted-list' as BlockType, 
+              content: trimmedLine.substring(2), 
+              orderIndex: index 
+            });
+          } else if (trimmedLine.startsWith('1. ')) {
+            newBlocks.push({ 
+              id: `block-${index}`, 
+              type: 'numbered-list' as BlockType, 
+              content: trimmedLine.substring(3), 
+              orderIndex: index 
+            });
+          } else if (trimmedLine.match(/^- \[ \]/)) {
+            newBlocks.push({ 
+              id: `block-${index}`, 
+              type: 'todo-list' as BlockType, 
+              content: trimmedLine.substring(6), 
+              orderIndex: index 
+            });
+          } else if (trimmedLine.startsWith('> ')) {
+            newBlocks.push({ 
+              id: `block-${index}`, 
+              type: 'quote' as BlockType, 
+              content: trimmedLine.substring(2), 
+              orderIndex: index 
+            });
+          } else if (trimmedLine.startsWith('```')) {
+            newBlocks.push({ 
+              id: `block-${index}`, 
+              type: 'code-block' as BlockType, 
+              content: '// Your code here', 
+              orderIndex: index 
+            });
+          } else if (trimmedLine === '---') {
+            newBlocks.push({ 
+              id: `block-${index}`, 
+              type: 'divider' as BlockType, 
+              content: '', 
+              orderIndex: index 
+            });
+          } else if (trimmedLine) {
+            newBlocks.push({ 
+              id: `block-${index}`, 
+              type: 'text' as BlockType, 
+              content: trimmedLine, 
+              orderIndex: index 
+            });
+          }
+        });
+      }
+      
+      if (newBlocks.length > 0) {
+        setBlocks(newBlocks);
+        setTitle(document?.title || "Shared Document");
+      } else if (isReadOnly) {
+        // If no content is provided, create a default block
+        setBlocks([{
+          id: 'default-block',
+          type: 'text' as BlockType,
+          content: 'This document appears to be empty.',
+          orderIndex: 0
+        }]);
+        setTitle(document?.title || "Shared Document");
+      }
+    }
+  }, [isReadOnly, initialContent, initialBlocksContent, document?.title]);
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -463,6 +590,8 @@ export default function Editor() {
 
   // Auto-save title changes
   const handleTitleChange = useCallback(async (newTitle: string) => {
+    if (isReadOnly) return; // Disable title changes in read-only mode
+    
     setTitle(newTitle);
     setTitleChanged(true);
     
@@ -488,6 +617,8 @@ export default function Editor() {
 
   // Handle block content changes
   const handleBlockChange = useCallback(async (blockId: string, newContent: string, newType?: BlockType) => {
+    if (isReadOnly) return; // Disable block changes in read-only mode
+    
     setBlocks(prev => prev.map(block => {
       if (block.id === blockId) {
         const updatedBlock = { ...block, content: newContent, type: newType || block.type };
@@ -538,6 +669,8 @@ export default function Editor() {
 
   // Handle slash commands
   const handleSlashCommand = useCallback((blockId: string, content: string) => {
+    if (isReadOnly) return; // Disable slash commands in read-only mode
+    
     if (content.trim() === '/') {
       setShowCommands(true);
       setActiveBlockId(blockId);
@@ -551,11 +684,11 @@ export default function Editor() {
     } else {
       setShowCommands(false);
     }
-  }, []);
+  }, [isReadOnly]);
 
   // Handle command selection
   const handleCommandSelect = useCallback(async (command: CommandItem) => {
-    if (!activeBlockId) return;
+    if (!activeBlockId || isReadOnly) return;
     
     const currentBlock = blocks.find(b => b.id === activeBlockId);
     if (!currentBlock) return;
@@ -1244,9 +1377,10 @@ export default function Editor() {
               <FileText className="h-5 w-5 text-muted-foreground" />
               <Input
                 value={title}
-                onChange={(e) => handleTitleChange(e.target.value)}
+                onChange={(e) => !isReadOnly && handleTitleChange(e.target.value)}
                 placeholder="Untitled Document"
                 className="text-lg font-semibold border-none shadow-none focus-visible:ring-0 px-0 h-auto min-w-[200px] bg-transparent"
+                disabled={isReadOnly}
               />
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -1282,26 +1416,28 @@ export default function Editor() {
               <Keyboard className="h-4 w-4" />
             </Button>
             
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-8"
-              onClick={async () => {
-                try {
-                  await saveDocument({ title, blocks_content: blocks });
-                  setTitleChanged(false);
-                  setContentChanged(false);
-                  toast.success('Document saved!');
-                } catch (error) {
-                  console.error('Failed to save document:', error);
-                  toast.error('Failed to save document');
-                }
-              }}
-              disabled={!titleChanged && !contentChanged}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              Save
-            </Button>
+            {!isReadOnly && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8"
+                onClick={async () => {
+                  try {
+                    await saveDocument({ title, blocks_content: blocks });
+                    setTitleChanged(false);
+                    setContentChanged(false);
+                    toast.success('Document saved!');
+                  } catch (error) {
+                    console.error('Failed to save document:', error);
+                    toast.error('Failed to save document');
+                  }
+                }}
+                disabled={!titleChanged && !contentChanged}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -1360,16 +1496,18 @@ export default function Editor() {
                     onDragEnd={() => setDragOverBlockId(null)}
                   >
                     {/* Drag handle with block type name - visible on hover */}
-                    <div 
-                      className="absolute left-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing z-0"
-                      draggable={true}
-                      onDragStart={(e) => handleDragStart(e, block.id)}
-                      title="Drag to reorder"
-                    >
-                      <div className="text-xs text-gray-500 font-mono bg-gray-800/50 px-2 py-1 rounded hover:bg-gray-700/50 hover:text-gray-300 transition-colors">
-                        {block.type.replace('-', ' ')}
+                    {!isReadOnly && (
+                      <div 
+                        className="absolute left-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing z-0"
+                        draggable={true}
+                        onDragStart={(e) => handleDragStart(e, block.id)}
+                        title="Drag to reorder"
+                      >
+                        <div className="text-xs text-gray-500 font-mono bg-gray-800/50 px-2 py-1 rounded hover:bg-gray-700/50 hover:text-gray-300 transition-colors">
+                          {block.type.replace('-', ' ')}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     
                     {/* Block content with proper padding */}
                     <div className="ml-20 mr-12 relative z-10">
@@ -1379,14 +1517,15 @@ export default function Editor() {
                     </div>
                     
                     {/* Three dots menu - visible on hover */}
-                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20" data-block-menu>
-                      <button
-                        onClick={() => setOpenMenuBlockId(openMenuBlockId === block.id ? null : block.id)}
-                        className="p-2 rounded-md hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
-                        title="Block options"
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </button>
+                    {!isReadOnly && (
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20" data-block-menu>
+                        <button
+                          onClick={() => setOpenMenuBlockId(openMenuBlockId === block.id ? null : block.id)}
+                          className="p-2 rounded-md hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
+                          title="Block options"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
                       
                       {/* Dropdown menu */}
                       {openMenuBlockId === block.id && (
@@ -1541,6 +1680,7 @@ export default function Editor() {
                         </div>
                       )}
                     </div>
+                    )}
                   </div>
                 ))}
               </>
@@ -1548,10 +1688,11 @@ export default function Editor() {
           </div>
             
            {/* Add new block button */}
-           <div className="mt-6 text-center">
-            <Button
-              variant="ghost"
-              onClick={() => {
+           {!isReadOnly && (
+             <div className="mt-6 text-center">
+              <Button
+                variant="ghost"
+                onClick={() => {
                 if (blocks.length > 0) {
                   addBlock(blocks[blocks.length - 1]?.id || '');
                 } else {
@@ -1577,11 +1718,12 @@ export default function Editor() {
               + Add new block
             </Button>
           </div>
+            )}
         </div>
       </div>
 
       {/* Command Palette */}
-      {showCommands && (
+      {showCommands && !isReadOnly && (
         <div 
           ref={commandPaletteRef}
           className="fixed z-50 w-96 bg-gray-800 border border-gray-700 rounded-lg shadow-xl backdrop-blur-sm"
@@ -1670,7 +1812,7 @@ export default function Editor() {
       )}
       
       {/* Floating Formatting Toolbar */}
-      {showFloatingToolbar && (
+      {showFloatingToolbar && !isReadOnly && (
         <div 
           className="fixed z-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl backdrop-blur-sm"
           style={{

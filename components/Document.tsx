@@ -2,12 +2,31 @@
 
 import Editor from "./Editor"
 
-const Document = ({id}:{
- id:string
-}) => {
+interface DocumentProps {
+  documentId?: string;
+  id?: string; // For backward compatibility
+  initialContent?: string;
+  initialBlocksContent?: any;
+  isReadOnly?: boolean;
+}
+
+const Document = ({ 
+  documentId, 
+  id, 
+  initialContent, 
+  initialBlocksContent, 
+  isReadOnly = false 
+}: DocumentProps) => {
+  const docId = documentId || id;
+  
   return (
     <div className="h-full w-full flex flex-col">
-      <Editor/>
+      <Editor 
+        documentId={docId}
+        initialContent={initialContent}
+        initialBlocksContent={initialBlocksContent}
+        isReadOnly={isReadOnly}
+      />
     </div>
   )
 }
