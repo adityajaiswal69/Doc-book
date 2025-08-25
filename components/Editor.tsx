@@ -736,7 +736,7 @@ export default function Editor() {
     setDragOverBlockId(null);
   }, [draggedBlockId, updateListIndices, saveDocument]);
 
-  // Auto-resize textarea height based on content
+  // Auto-resize textarea height based on content and block type
   const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement) => {
     // Only resize if the textarea is actually mounted and visible
     if (!textarea || !textarea.isConnected) return;
@@ -747,29 +747,61 @@ export default function Editor() {
     // Get the exact content height
     const contentHeight = textarea.scrollHeight;
     
-    // For empty content, use a fixed small height
-    if (!textarea.value || textarea.value.trim() === '') {
-      textarea.style.height = '25px';
-    } else {
-      // Check if content has multiple lines or needs wrapping
-      const hasMultipleLines = textarea.value.includes('\n');
-      const lines = textarea.value.split('\n');
-      const maxLineLength = Math.max(...lines.map(line => line.length));
-      
-      // Only increase height if there are multiple lines or very long single lines that wrap
-      if (hasMultipleLines || maxLineLength > 80) {
-        const neededHeight = Math.max(contentHeight, 16);
-        textarea.style.height = `${neededHeight}px`;
-      } else {
-        // Keep single-line content at minimum height
-        textarea.style.height = '25px';
+    // Get block type from the textarea's parent or data attribute
+    const blockId = textarea.dataset.blockId;
+    const block = blocks.find(b => b.id === blockId);
+    
+    // Calculate minimum height based on block type
+    let minHeight = 25; // Default minimum
+    
+    if (block) {
+      switch (block.type) {
+        case 'heading-1':
+          minHeight = 32 * 1.2; // fontSize * lineHeight
+          break;
+        case 'heading-2':
+          minHeight = 24 * 1.3; // fontSize * lineHeight
+          break;
+        case 'heading-3':
+          minHeight = 20 * 1.4; // fontSize * lineHeight
+          break;
+        case 'text':
+        case 'bulleted-list':
+        case 'numbered-list':
+        case 'todo-list':
+        case 'quote':
+          minHeight = 16 * 1.6; // fontSize * lineHeight
+          break;
+        case 'code-block':
+          minHeight = 16 * 1.5; // fontSize * lineHeight
+          break;
+        default:
+          minHeight = 16 * 1.6; // Default fontSize * lineHeight
       }
     }
+    
+    // Calculate proper height based on content
+    if (!textarea.value || textarea.value.trim() === '') {
+      // Empty blocks get minimum height based on type
+      textarea.style.height = `${minHeight}px`;
+    } else {
+      // Check if content has multiple lines
+      const hasMultipleLines = textarea.value.includes('\n');
       
+      if (hasMultipleLines) {
+        // Only increase height if there are actual line breaks
+        const neededHeight = Math.max(contentHeight, minHeight);
+        textarea.style.height = `${neededHeight}px`;
+      } else {
+        // Single line content stays at minimum height
+        textarea.style.height = `${minHeight}px`;
+      }
+    }
+    
     // Remove any conflicting styles that might prevent auto-height
     textarea.style.minHeight = '';
     textarea.style.maxHeight = '';
-  }, []);
+  }, [blocks]);
 
   // Debounced resize function for better performance
   const debouncedResize = useCallback((textarea: HTMLTextAreaElement) => {
