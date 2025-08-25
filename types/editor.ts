@@ -24,6 +24,7 @@ export type BlockType =
   | 'divider'
   | 'table'
   | 'image'
+  | 'im'
   | 'video';
 
 export interface BlockMetadata {
@@ -32,6 +33,11 @@ export interface BlockMetadata {
   alt?: string; // For images
   columns?: number; // For tables
   rows?: number; // For tables
+  mode?: 'upload' | 'external'; // For images: uploaded or external URL
+  filePath?: string; // For uploaded images: storage path
+  originalFilename?: string; // For uploaded images: original filename
+  fileSize?: number; // For uploaded images: file size in bytes
+  mimeType?: string; // For uploaded images: MIME type
   [key: string]: any; // Allow additional metadata
 }
 

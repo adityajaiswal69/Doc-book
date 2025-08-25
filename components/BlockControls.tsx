@@ -72,15 +72,15 @@ export default function BlockControls({
     { value: BlockType.CODE_BLOCK, label: "Code block", icon: "{}" },
     { value: BlockType.DIVIDER, label: "Divider", icon: "—" },
     { value: BlockType.TABLE, label: "Table", icon: "⊞" },
-    { value: BlockType.IMAGE, label: "Image", icon: "🖼" },
-    { value: BlockType.VIDEO, label: "Video", icon: "🎥" },
+    { value: BlockType.IMAGE, label: "Image", icon: <ImageIcon className="h-4 w-4" /> },
+    { value: BlockType.VIDEO, label: "Video", icon: <VideoIcon className="h-4 w-4" /> },
     { value: BlockType.BOOKMARK, label: "Bookmark", icon: "🔖" },
     { value: BlockType.CALLOUT, label: "Callout", icon: "💡" },
     { value: BlockType.COLUMNS, label: "Columns", icon: "⊞" },
     { value: BlockType.MATH, label: "Math", icon: "∑" },
     { value: BlockType.MENTION, label: "Mention", icon: "@" },
-    { value: BlockType.PAGE_REFERENCE, label: "Page reference", icon: "📄" },
-    { value: BlockType.DATABASE_REFERENCE, label: "Database", icon: "🗄" }
+    { value: BlockType.PAGE_REFERENCE, label: "Page reference", icon: <FileText className="h-4 w-4" /> },
+    { value: BlockType.DATABASE_REFERENCE, label: "Database", icon: <Database className="h-4 w-4" /> }
   ];
 
   const currentBlockType = blockTypeOptions.find(opt => opt.value === block.type);

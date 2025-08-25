@@ -6,7 +6,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X, MoreHorizontal } from "lucide-react";
+import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X, MoreHorizontal, AlertTriangle, Wrench, FileIcon, Keyboard, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash } from "lucide-react";
+import ImageBlock from "@/components/blocks/ImageBlock";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
 import { Block, BlockType, CommandItem } from "@/types/editor";
@@ -229,19 +230,20 @@ export default function Editor() {
         newCursorPosition: content.length
       })
     },
+
     {
-      id: "image",
-      title: "Image",
-      description: "Insert an image URL",
+      id: "im",
+      title: "Uploadable Image",
+      description: "Upload image or add external URL",
       icon: <Image className="h-4 w-4" />,
       preview: (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
           <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-          <div className="text-gray-400 text-sm">Image URL</div>
+          <div className="text-gray-400 text-sm">Upload or URL</div>
         </div>
       ),
       action: (content) => ({
-        newContent: content ,
+        newContent: content,
         newCursorPosition: content.length
       })
     },
@@ -295,6 +297,13 @@ export default function Editor() {
           if (newBlock.type === 'image' && !newBlock.metadata) {
             newBlock.metadata = {
               url: newBlock.content,
+              type: 'image'
+            };
+          } else if (newBlock.type === 'im' && !newBlock.metadata) {
+            // For uploadable image blocks, ensure metadata is properly initialized
+            newBlock.metadata = {
+              mode: undefined,
+              url: undefined,
               type: 'image'
             };
           } else if (newBlock.type === 'video' && !newBlock.metadata) {
@@ -541,6 +550,15 @@ export default function Editor() {
               url: result.newContent,
               type: 'image'
             };
+          } else if (command.id === 'im') {
+            // For uploadable image blocks, initialize with empty metadata
+            // The ImageBlock component will handle the upload/URL functionality
+            updatedBlock.metadata = {
+              ...updatedBlock.metadata,
+              mode: undefined,
+              url: undefined,
+              type: 'image'
+            };
           } else if (command.id === 'video') {
             updatedBlock.metadata = {
               ...updatedBlock.metadata,
@@ -729,10 +747,25 @@ export default function Editor() {
     // Get the exact content height
     const contentHeight = textarea.scrollHeight;
     
-    // Set height to content height with minimal constraints
-    const newHeight = Math.max(contentHeight, 24); // Small minimum height for cursor visibility
-    textarea.style.height = `${newHeight}px`;
-    
+    // For empty content, use a fixed small height
+    if (!textarea.value || textarea.value.trim() === '') {
+      textarea.style.height = '25px';
+    } else {
+      // Check if content has multiple lines or needs wrapping
+      const hasMultipleLines = textarea.value.includes('\n');
+      const lines = textarea.value.split('\n');
+      const maxLineLength = Math.max(...lines.map(line => line.length));
+      
+      // Only increase height if there are multiple lines or very long single lines that wrap
+      if (hasMultipleLines || maxLineLength > 80) {
+        const neededHeight = Math.max(contentHeight, 16);
+        textarea.style.height = `${neededHeight}px`;
+      } else {
+        // Keep single-line content at minimum height
+        textarea.style.height = '25px';
+      }
+    }
+      
     // Remove any conflicting styles that might prevent auto-height
     textarea.style.minHeight = '';
     textarea.style.maxHeight = '';
@@ -824,7 +857,7 @@ export default function Editor() {
       },
       onKeyDown: (e: React.KeyboardEvent) => handleBlockKeyDown(e, block.id),
       placeholder: `Type '/' for commands...`,
-      className: "w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2",
+      className: "w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-2 py-1",
       style: {
         fontSize: '16px',
         lineHeight: '1.6',
@@ -972,6 +1005,36 @@ export default function Editor() {
             )}
           </div>
         );
+      case 'im':
+        return (
+          <ImageBlock
+            block={block}
+            documentId={documentId}
+            onContentChange={(blockId, content, metadata) => {
+              handleBlockChange(blockId, content);
+              // Update metadata separately if provided
+              if (metadata) {
+                setBlocks(prev => prev.map(b => 
+                  b.id === blockId 
+                    ? { ...b, metadata: { ...b.metadata, ...metadata } }
+                    : b
+                ));
+              }
+            }}
+            onBlockDelete={(blockId) => {
+              if (blocks.length > 1) {
+                setBlocks(prev => {
+                  const filteredBlocks = prev.filter(b => b.id !== blockId);
+                  const updatedBlocks = filteredBlocks.map((block, idx) => ({
+                    ...block,
+                    orderIndex: idx
+                  }));
+                  return updateListIndices(updatedBlocks);
+                });
+              }
+            }}
+          />
+        );
       case 'video':
         return (
           <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
@@ -1057,7 +1120,7 @@ export default function Editor() {
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
-              <div className="text-red-500 text-2xl">⚠️</div>
+              <AlertTriangle className="h-8 w-8 text-red-500 mx-auto" />
               <h3 className="text-lg font-semibold">Error Loading Document</h3>
               <p className="text-sm text-muted-foreground">{error}</p>
               
@@ -1083,7 +1146,8 @@ export default function Editor() {
                     }}
                     className="w-full"
                   >
-                    🔧 Repair Access
+                    <Wrench className="h-4 w-4 mr-2" />
+                    Repair Access
                   </Button>
                 </div>
               )}
@@ -1098,7 +1162,7 @@ export default function Editor() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center space-y-4">
-          <div className="text-muted-foreground text-2xl">📄</div>
+          <FileIcon className="h-8 w-8 text-muted-foreground mx-auto" />
           <h3 className="text-lg font-semibold">Document Not Found</h3>
           <p className="text-sm text-muted-foreground">The document you're looking for doesn't exist.</p>
         </div>
@@ -1133,8 +1197,8 @@ export default function Editor() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
-                <span>📄 {blocks.length} blocks</span>
-                <span>📝 {blocks.reduce((total, block) => total + (block.content?.split(/\s+/).length || 0), 0)} words</span>
+                <span className="flex items-center gap-1"><FileIcon className="h-3 w-3" /> {blocks.length} blocks</span>
+                <span className="flex items-center gap-1"><Type className="h-3 w-3" /> {blocks.reduce((total, block) => total + (block.content?.split(/\s+/).length || 0), 0)} words</span>
               </div>
               <div>
                 {saving ? 'Saving...' : contentChanged ? 'Unsaved changes' : 'All changes saved'}
@@ -1151,7 +1215,7 @@ export default function Editor() {
               }}
               title="Keyboard shortcuts"
             >
-              ⌨️
+              <Keyboard className="h-4 w-4" />
             </Button>
             
             <Button 
@@ -1192,7 +1256,7 @@ export default function Editor() {
           <div className="space-y-3">
             {blocks.length === 0 ? (
               <div className="text-center py-12 text-gray-400">
-                <div className="text-6xl mb-4">✨</div>
+                <Sparkles className="h-16 w-16 mx-auto text-blue-400 mb-4" />
                 <h3 className="text-xl font-semibold mb-2">Welcome to your document!</h3>
                 <p className="text-sm mb-6">Start typing to create your first block, or use the slash commands below</p>
                 
@@ -1203,11 +1267,11 @@ export default function Editor() {
                     { icon: '[]', title: 'Todo', desc: 'Type [ ] for tasks' },
                     { icon: '>', title: 'Quote', desc: 'Type > for quotes' },
                     { icon: '```', title: 'Code', desc: 'Type ``` for code blocks' },
-                    { icon: '📷', title: 'Image', desc: 'Type /image for images' },
-                    { icon: '🎥', title: 'Video', desc: 'Type /video for videos' },
-                    { icon: '📊', title: 'Table', desc: 'Type /table for tables' }
+                    { icon: <Camera className="h-6 w-6" />, title: 'Image', desc: 'Type /image for images' },
+                    { icon: <Film className="h-6 w-6" />, title: 'Video', desc: 'Type /video for videos' },
+                    { icon: <BarChart3 className="h-6 w-6" />, title: 'Table', desc: 'Type /table for tables' }
                   ].map((tip, i) => (
-                    <div key={i} className="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                    <div key={i} className="bg-gray-800/50 p-3 rounded-lg border border-gray-700 flex flex-col items-center justify-center">
                       <div className="text-2xl mb-2">{tip.icon}</div>
                       <div className="text-xs font-medium text-white">{tip.title}</div>
                       <div className="text-xs text-gray-500">{tip.desc}</div>
@@ -1231,107 +1295,23 @@ export default function Editor() {
                     onDrop={(e) => handleDrop(e, block.id)}
                     onDragEnd={() => setDragOverBlockId(null)}
                   >
-                    {/* Block type indicator */}
-                    <div className="absolute top-2 left-2 text-xs text-gray-500 font-mono bg-gray-800/50 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-0">
-                      {block.type.replace('-', ' ')}
-                    </div>
-                    
-                    {/* Drag handle - visible on hover */}
+                    {/* Drag handle with block type name - visible on hover */}
                     <div 
-                      className="absolute left-8 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing p-2 z-0"
+                      className="absolute left-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing z-0"
                       draggable={true}
                       onDragStart={(e) => handleDragStart(e, block.id)}
                       title="Drag to reorder"
                     >
-                      <div className="flex flex-col gap-0.5">
-                        <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-                        <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-                        <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                      <div className="text-xs text-gray-500 font-mono bg-gray-800/50 px-2 py-1 rounded hover:bg-gray-700/50 hover:text-gray-300 transition-colors">
+                        {block.type.replace('-', ' ')}
                       </div>
                     </div>
                     
                     {/* Block content with proper padding */}
-                    <div className="ml-16 mr-12 relative z-10">
+                    <div className="ml-20 mr-12 relative z-10">
                       {renderBlock(block)}
                       
-                      {/* Quick actions toolbar - visible on hover */}
-                      <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <button
-                          onClick={() => {
-                            const newBlock: Block = { id: `block-${Date.now()}`, type: 'text' as BlockType, content: '' };
-                            setBlocks(prev => {
-                              const index = prev.findIndex(b => b.id === block.id);
-                              const newBlocks = [...prev];
-                              newBlocks.splice(index + 1, 0, newBlock);
-                              
-                              // Update order indices for all blocks
-                              const updatedBlocks = newBlocks.map((block, idx) => ({
-                                ...block,
-                                orderIndex: idx
-                              }));
-                              
-                              const finalBlocks = updateListIndices(updatedBlocks);
-                              
-                              // Save the updated blocks to the backend
-                              (async () => {
-                                try {
-                                  setContentChanged(true);
-                                  await saveDocument({ blocks_content: finalBlocks });
-                                  setContentChanged(false);
-                                } catch (error) {
-                                  console.error('Failed to save after adding block:', error);
-                                  setContentChanged(true);
-                                }
-                              })();
-                              
-                              return finalBlocks;
-                            });
-                            toast.success("New block added");
-                          }}
-                          className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
-                          title="Add block below"
-                        >
-                          + Add below
-                        </button>
-                        
-                        <button
-                          onClick={() => {
-                            const newBlock: Block = { id: `block-${Date.now()}`, type: block.type, content: '' };
-                            setBlocks(prev => {
-                              const index = prev.findIndex(b => b.id === block.id);
-                              const newBlocks = [...prev];
-                              newBlocks.splice(index + 1, 0, newBlock);
-                              
-                              // Update order indices for all blocks
-                              const updatedBlocks = newBlocks.map((block, idx) => ({
-                                ...block,
-                                orderIndex: idx
-                              }));
-                              
-                              const finalBlocks = updateListIndices(updatedBlocks);
-                              
-                              // Save the updated blocks to the backend
-                              (async () => {
-                                try {
-                                  setContentChanged(true);
-                                  await saveDocument({ blocks_content: finalBlocks });
-                                  setContentChanged(false);
-                                } catch (error) {
-                                  console.error('Failed to save after duplicating block:', error);
-                                  setContentChanged(true);
-                                }
-                              })();
-                              
-                              return finalBlocks;
-                            });
-                            toast.success("Block duplicated");
-                          }}
-                          className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
-                          title="Duplicate block"
-                        >
-                          📋 Duplicate
-                        </button>
-                      </div>
+
                     </div>
                     
                     {/* Three dots menu - visible on hover */}
@@ -1355,7 +1335,7 @@ export default function Editor() {
                           <div className="p-2 border-b border-gray-700">
                             <div className="text-xs text-gray-400 font-medium mb-2">Change Type</div>
                             <div className="grid grid-cols-2 gap-1">
-                              {(['text', 'heading-1', 'heading-2', 'heading-3', 'bulleted-list', 'numbered-list', 'todo-list', 'quote', 'code-block'] as BlockType[]).map((type) => (
+                              {(['text', 'heading-1', 'heading-2', 'heading-3', 'bulleted-list', 'numbered-list', 'todo-list', 'quote', 'code-block', 'im'] as BlockType[]).map((type) => (
                                 <button
                                   key={type}
                                   onClick={() => {
@@ -1375,43 +1355,83 @@ export default function Editor() {
                             </div>
                           </div>
                           
-                                                      <button
-                              onClick={() => {
-                                const newBlock: Block = { id: `block-${Date.now()}`, type: block.type, content: '' };
-                                setBlocks(prev => {
-                                  const index = prev.findIndex(b => b.id === block.id);
-                                  const newBlocks = [...prev];
-                                  newBlocks.splice(index + 1, 0, newBlock);
-                                  
-                                  // Update order indices for all blocks
-                                  const updatedBlocks = newBlocks.map((block, idx) => ({
-                                    ...block,
-                                    orderIndex: idx
-                                  }));
-                                  
-                                  const finalBlocks = updateListIndices(updatedBlocks);
-                                  
-                                  // Save the updated blocks to the backend
-                                  (async () => {
-                                    try {
-                                      setContentChanged(true);
-                                      await saveDocument({ blocks_content: finalBlocks });
-                                      setContentChanged(false);
-                                    } catch (error) {
-                                      console.error('Failed to save after block duplication:', error);
-                                      setContentChanged(true);
-                                    }
-                                  })();
-                                  
-                                  return finalBlocks;
-                                });
-                                setOpenMenuBlockId(null);
-                                toast.success("Block duplicated");
-                              }}
-                              className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
-                            >
-                              📋 Duplicate block
-                            </button>
+                          <button
+                            onClick={() => {
+                              const newBlock: Block = { id: `block-${Date.now()}`, type: 'text' as BlockType, content: '' };
+                              setBlocks(prev => {
+                                const index = prev.findIndex(b => b.id === block.id);
+                                const newBlocks = [...prev];
+                                newBlocks.splice(index + 1, 0, newBlock);
+                                
+                                // Update order indices for all blocks
+                                const updatedBlocks = newBlocks.map((block, idx) => ({
+                                  ...block,
+                                  orderIndex: idx
+                                }));
+                                
+                                const finalBlocks = updateListIndices(updatedBlocks);
+                                
+                                // Save the updated blocks to the backend
+                                (async () => {
+                                  try {
+                                    setContentChanged(true);
+                                    await saveDocument({ blocks_content: finalBlocks });
+                                    setContentChanged(false);
+                                  } catch (error) {
+                                    console.error('Failed to save after adding block:', error);
+                                    setContentChanged(true);
+                                  }
+                                })();
+                                
+                                return finalBlocks;
+                              });
+                              setOpenMenuBlockId(null);
+                              toast.success("New block added");
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add below
+                          </button>
+                          
+                          <button
+                            onClick={() => {
+                              const newBlock: Block = { id: `block-${Date.now()}`, type: block.type, content: '' };
+                              setBlocks(prev => {
+                                const index = prev.findIndex(b => b.id === block.id);
+                                const newBlocks = [...prev];
+                                newBlocks.splice(index + 1, 0, newBlock);
+                                
+                                // Update order indices for all blocks
+                                const updatedBlocks = newBlocks.map((block, idx) => ({
+                                  ...block,
+                                  orderIndex: idx
+                                }));
+                                
+                                const finalBlocks = updateListIndices(updatedBlocks);
+                                
+                                // Save the updated blocks to the backend
+                                (async () => {
+                                  try {
+                                    setContentChanged(true);
+                                    await saveDocument({ blocks_content: finalBlocks });
+                                    setContentChanged(false);
+                                  } catch (error) {
+                                    console.error('Failed to save after block duplication:', error);
+                                    setContentChanged(true);
+                                  }
+                                })();
+                                
+                                return finalBlocks;
+                              });
+                              setOpenMenuBlockId(null);
+                              toast.success("Block duplicated");
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Duplicate block
+                          </button>
                           
                           <button
                             onClick={() => {
@@ -1450,7 +1470,8 @@ export default function Editor() {
                             disabled={blocks.length <= 1}
                             className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-gray-700 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-t border-gray-700"
                           >
-                            🗑️ Delete block
+                            <Trash className="h-4 w-4 mr-2" />
+                            Delete block
                           </button>
                         </div>
                       )}
@@ -1641,7 +1662,7 @@ export default function Editor() {
               className="p-2 hover:bg-gray-700 rounded text-gray-300 hover:text-white transition-colors"
               title="Insert Link"
             >
-              🔗
+              <Link className="h-4 w-4" />
             </button>
             
             <button

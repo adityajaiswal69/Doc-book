@@ -744,3 +744,347 @@ export async function moveDocument(documentId: string, newParentId: string | nul
     throw error
   }
 }
+
+// Image handling functions
+export async function uploadImage(
+  documentId: string, 
+  blockId: string, 
+  file: File, 
+  userId: string
+) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Uploading image for document:', documentId, 'block:', blockId, 'user:', userId)
+
+    // Check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', documentId)
+      throw new Error("Access denied to this document")
+    }
+
+    // Get document title for storage path
+    const { data: document, error: documentError } = await supabase
+      .from('documents')
+      .select('title')
+      .eq('id', documentId)
+      .single()
+
+    if (documentError || !document) {
+      console.error('Document not found:', documentId)
+      throw new Error("Document not found")
+    }
+
+    // Create storage path
+    const sanitizedTitle = document.title.toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+    const storagePath = `${sanitizedTitle}/${blockId}.image/${file.name}`
+
+    // Check if bucket exists first
+    const { data: buckets, error: bucketError } = await supabase.storage.listBuckets()
+    
+    if (bucketError) {
+      console.error('Error checking buckets:', bucketError)
+      throw new Error('Failed to access storage')
+    }
+
+    const imagesBucket = buckets.find(bucket => bucket.name === 'images')
+    if (!imagesBucket) {
+      throw new Error('Storage bucket "images" not found. Please create the bucket first using the setup script or manual setup guide.')
+    }
+
+    // Upload file to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('images')
+      .upload(storagePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+
+    if (uploadError) {
+      console.error('Error uploading file:', uploadError)
+      
+      // Provide more specific error messages
+      if (uploadError.message.includes('not found')) {
+        throw new Error('Storage bucket "images" not found. Please run the setup script or follow the manual setup guide.')
+      } else if (uploadError.message.includes('permission')) {
+        throw new Error('Permission denied. Please check your storage bucket policies.')
+      } else if (uploadError.message.includes('file size')) {
+        throw new Error('File size exceeds the allowed limit (50MB).')
+      } else if (uploadError.message.includes('file type')) {
+        throw new Error('File type not allowed. Please use JPG, PNG, GIF, WebP, SVG, or BMP.')
+      } else {
+        throw new Error(`Failed to upload file: ${uploadError.message}`)
+      }
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('images')
+      .getPublicUrl(storagePath)
+
+    // Store image metadata in database
+    const { data: imageData, error: imageError } = await supabase
+      .rpc('handle_image_block', {
+        p_document_id: documentId,
+        p_block_id: blockId,
+        p_mode: 'upload',
+        p_url: urlData.publicUrl,
+        p_original_filename: file.name,
+        p_file_size: file.size,
+        p_mime_type: file.type
+      })
+
+    if (imageError) {
+      console.error('Error storing image metadata:', imageError)
+      // Clean up uploaded file if metadata storage fails
+      await supabase.storage.from('images').remove([storagePath])
+      throw new Error(`Failed to store image metadata: ${imageError.message}`)
+    }
+
+    console.log('Image uploaded successfully:', imageData)
+    return { 
+      success: true, 
+      imageData,
+      url: urlData.publicUrl,
+      filePath: storagePath
+    }
+  } catch (error) {
+    console.error('Error in uploadImage:', error)
+    throw error
+  }
+}
+
+export async function addExternalImage(
+  documentId: string, 
+  blockId: string, 
+  url: string, 
+  userId: string,
+  altText?: string
+) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Adding external image for document:', documentId, 'block:', blockId, 'user:', userId)
+
+    // Check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', documentId)
+      throw new Error("Access denied to this document")
+    }
+
+    // Validate URL
+    const { data: isValid } = await supabase
+      .rpc('validate_image_url', { p_url: url })
+
+    if (!isValid) {
+      throw new Error("Invalid image URL format")
+    }
+
+    // Store image metadata in database
+    const { data: imageData, error: imageError } = await supabase
+      .rpc('handle_image_block', {
+        p_document_id: documentId,
+        p_block_id: blockId,
+        p_mode: 'external',
+        p_url: url,
+        p_alt_text: altText
+      })
+
+    if (imageError) {
+      console.error('Error storing external image metadata:', imageError)
+      throw new Error(`Failed to store image metadata: ${imageError.message}`)
+    }
+
+    console.log('External image added successfully:', imageData)
+    return { 
+      success: true, 
+      imageData,
+      url: url
+    }
+  } catch (error) {
+    console.error('Error in addExternalImage:', error)
+    throw error
+  }
+}
+
+export async function deleteImage(documentId: string, blockId: string, userId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Deleting image for document:', documentId, 'block:', blockId, 'user:', userId)
+
+    // Check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', documentId)
+      throw new Error("Access denied to this document")
+    }
+
+    // Get image data to check if it's an uploaded file
+    const { data: imageData, error: imageError } = await supabase
+      .from('storage_images')
+      .select('*')
+      .eq('document_id', documentId)
+      .eq('block_id', blockId)
+      .single()
+
+    if (imageError) {
+      console.error('Error fetching image data:', imageError)
+      throw new Error(`Failed to fetch image data: ${imageError.message}`)
+    }
+
+    if (!imageData) {
+      console.log('No image found for deletion')
+      return { success: true, message: 'No image found' }
+    }
+
+    // If it's an uploaded image, delete the file from storage
+    if (imageData.mode === 'upload' && imageData.file_path) {
+      const { error: storageError } = await supabase.storage
+        .from('images')
+        .remove([imageData.file_path])
+
+      if (storageError) {
+        console.error('Error deleting file from storage:', storageError)
+        // Continue with database deletion even if storage deletion fails
+      }
+    }
+
+    // Delete from database
+    const { data: deleteData, error: deleteError } = await supabase
+      .rpc('delete_image_block', {
+        p_document_id: documentId,
+        p_block_id: blockId
+      })
+
+    if (deleteError) {
+      console.error('Error deleting image from database:', deleteError)
+      throw new Error(`Failed to delete image: ${deleteError.message}`)
+    }
+
+    console.log('Image deleted successfully')
+    return { success: true, message: 'Image deleted successfully' }
+  } catch (error) {
+    console.error('Error in deleteImage:', error)
+    throw error
+  }
+}
+
+export async function getDocumentImages(documentId: string, userId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Getting images for document:', documentId, 'user:', userId)
+
+    // Check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', documentId)
+      throw new Error("Access denied to this document")
+    }
+
+    // Get all images for the document
+    const { data: images, error: imagesError } = await supabase
+      .rpc('get_document_images', { p_document_id: documentId })
+
+    if (imagesError) {
+      console.error('Error fetching document images:', imagesError)
+      throw new Error(`Failed to fetch images: ${imagesError.message}`)
+    }
+
+    return { success: true, images: images || [] }
+  } catch (error) {
+    console.error('Error in getDocumentImages:', error)
+    throw error
+  }
+}
+
+export async function cleanupOrphanedImages(userId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Cleaning up orphaned images for user:', userId)
+
+    // This function should only be called by admin users or system processes
+    // For now, we'll add a basic check
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('role')
+      .eq('user_id', userId)
+      .limit(1)
+
+    if (userRoomError || !userRoom || userRoom.length === 0) {
+      throw new Error("Access denied")
+    }
+
+    // Get orphaned images
+    const { data: orphanedImages, error: orphanedError } = await supabase
+      .rpc('get_orphaned_images')
+
+    if (orphanedError) {
+      console.error('Error fetching orphaned images:', orphanedError)
+      throw new Error(`Failed to fetch orphaned images: ${orphanedError.message}`)
+    }
+
+    let deletedCount = 0;
+    if (orphanedImages && orphanedImages.length > 0) {
+      // Delete files from storage
+      for (const image of orphanedImages) {
+        if (image.file_path) {
+          const { error: storageError } = await supabase.storage
+            .from('images')
+            .remove([image.file_path])
+
+          if (storageError) {
+            console.error('Error deleting orphaned file from storage:', storageError)
+          }
+        }
+      }
+
+      // Mark as deleted in database
+      const { data: cleanupData, error: cleanupError } = await supabase
+        .rpc('cleanup_orphaned_images')
+
+      if (cleanupError) {
+        console.error('Error cleaning up orphaned images:', cleanupError)
+        throw new Error(`Failed to cleanup orphaned images: ${cleanupError.message}`)
+      }
+
+      deletedCount = cleanupData || 0;
+    }
+
+    console.log('Orphaned images cleanup completed:', deletedCount, 'images deleted')
+    return { success: true, deletedCount }
+  } catch (error) {
+    console.error('Error in cleanupOrphanedImages:', error)
+    throw error
+  }
+}

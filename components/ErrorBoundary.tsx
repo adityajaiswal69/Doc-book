@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -35,7 +36,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       return (
         <div className="flex items-center justify-center min-h-screen bg-background">
           <div className="text-center space-y-4 max-w-md mx-auto px-4">
-            <div className="text-red-500 text-6xl">⚠️</div>
+            <AlertTriangle className="h-16 w-16 text-red-500 mx-auto" />
             <h1 className="text-2xl font-bold">Something went wrong</h1>
             <p className="text-muted-foreground">
               {this.state.error?.message || 'An unexpected error occurred'}

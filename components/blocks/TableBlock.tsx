@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Plus, Trash2, MoreHorizontal } from "lucide-react";
+import { Plus, Trash2, MoreHorizontal, BarChart3 } from "lucide-react";
 import { RichBlock, BlockType } from "@/types/editor";
 import RichTextBlock from "../RichTextBlock";
 import { Button } from "@/components/ui/button";
@@ -287,7 +287,9 @@ export default function TableBlock({
       {/* Empty State */}
       {tableData.length === 0 && (
         <div className="text-center py-8 text-gray-400">
-          <div className="text-4xl mb-2">📊</div>
+          <div className="text-4xl mb-2">
+            <BarChart3 className="h-12 w-12 mx-auto text-gray-400" />
+          </div>
           <p>No table data</p>
         </div>
       )}

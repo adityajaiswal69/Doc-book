@@ -3,6 +3,7 @@
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CheckCircle } from "lucide-react";
 
 export default function TestAuth() {
   const { user, session, loading, signOut } = useAuth();
@@ -46,7 +47,10 @@ export default function TestAuth() {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>Authentication Working! ✅</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          Authentication Working! 
+          <CheckCircle className="h-5 w-5 text-green-500" />
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
