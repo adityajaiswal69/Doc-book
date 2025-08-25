@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X, MoreHorizontal, AlertTriangle, Wrench, FileIcon, Keyboard, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash } from "lucide-react";
+import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X, MoreHorizontal, AlertTriangle, Wrench, FileIcon, Keyboard, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash, Heading3, Heading2, Heading1, Heading1Icon } from "lucide-react";
 import ImageBlock from "@/components/blocks/ImageBlock";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
@@ -57,6 +57,38 @@ export default function Editor() {
   const blockRefs = useRef<{ [key: string]: HTMLTextAreaElement }>({});
   const commandPaletteRef = useRef<HTMLDivElement>(null);
   const resizeTimeoutsRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
+
+  // Function to get icon for block type
+  const getBlockTypeIcon = (type: BlockType) => {
+    switch (type) {
+      case 'text':
+        return <Type className="h-5 w-5" />;
+      case 'heading-1':
+        return <Heading1 className="h-5 w-5" />;
+      case 'heading-2':
+        return <Heading2 className="h-5 w-5" />;
+      case 'heading-3':
+        return <Heading3 className="h-5 w-5" />
+      case 'bulleted-list':
+        return <List className="h-5 w-5" />;
+      case 'numbered-list':
+        return <List className="h-5 w-5" />;
+      case 'todo-list':
+        return <CheckSquare className="h-5 w-5" />;
+      case 'quote':
+        return <Quote className="h-5 w-5" />;
+      case 'code-block':
+        return <Code className="h-5 w-5" />;
+      case 'im':
+        return <Image className="h-5 w-5" />;
+      case 'video':
+        return <Video className="h-5 w-5" />;
+      case 'table':
+        return <Table className="h-5 w-5" />;
+      default:
+        return <Type className="h-5 w-5" />;
+    }
+  };
 
   // Advanced commands with previews
   const commands: CommandItem[] = [
@@ -1366,8 +1398,8 @@ export default function Editor() {
                           {/* Block type switcher */}
                           <div className="p-2 border-b border-gray-700">
                             <div className="text-xs text-gray-400 font-medium mb-2">Change Type</div>
-                            <div className="grid grid-cols-2 gap-1">
-                              {(['text', 'heading-1', 'heading-2', 'heading-3', 'bulleted-list', 'numbered-list', 'todo-list', 'quote', 'code-block', 'im'] as BlockType[]).map((type) => (
+                            <div className="grid grid-cols-4 gap-1">
+                              {(['text', 'heading-1', 'heading-2', 'heading-3', 'bulleted-list', 'numbered-list', 'todo-list', 'quote', 'code-block', 'im', 'video', 'table'] as BlockType[]).map((type) => (
                                 <button
                                   key={type}
                                   onClick={() => {
@@ -1375,13 +1407,14 @@ export default function Editor() {
                                     setOpenMenuBlockId(null);
                                     toast.success(`Changed to ${type.replace('-', ' ')}`);
                                   }}
-                                  className={`px-2 py-1 text-xs rounded transition-colors ${
+                                  className={`p-2 rounded transition-colors flex items-center justify-center ${
                                     block.type === type 
                                       ? 'bg-blue-600 text-white' 
                                       : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                                   }`}
+                                  title={type.replace('-', ' ')}
                                 >
-                                  {type.replace('-', ' ')}
+                                  {getBlockTypeIcon(type as BlockType)}
                                 </button>
                               ))}
                             </div>
@@ -1420,7 +1453,7 @@ export default function Editor() {
                               setOpenMenuBlockId(null);
                               toast.success("New block added");
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex"
                           >
                             <Plus className="h-4 w-4 mr-2" />
                             Add below
@@ -1459,7 +1492,7 @@ export default function Editor() {
                               setOpenMenuBlockId(null);
                               toast.success("Block duplicated");
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex"
                           >
                             <Copy className="h-4 w-4 mr-2" />
                             Duplicate block
@@ -1500,7 +1533,7 @@ export default function Editor() {
                               setOpenMenuBlockId(null);
                             }}
                             disabled={blocks.length <= 1}
-                            className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-gray-700 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-t border-gray-700"
+                            className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-gray-700 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-t border-gray-700 flex"
                           >
                             <Trash className="h-4 w-4 mr-2" />
                             Delete block
