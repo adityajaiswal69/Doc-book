@@ -2,7 +2,7 @@
 
 import { useDocuments } from "@/hooks/use-documents";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -25,16 +25,29 @@ import {
   HelpCircle,
   ChevronDown,
   Edit3,
-  Lock
+  Lock,
+  FolderPlus
 } from "lucide-react";
 import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
+import DocumentTree from "./DocumentTree";
+import { DocumentNode } from "@/types/database";
 
 export default function AppSidebar() {
   const { user, signOut } = useAuth();
-  const { documents, loading, error, refetch } = useDocuments();
+  const { 
+    documents, 
+    loading, 
+    error, 
+    refreshDocuments,
+    updateDocumentInState,
+    addDocumentToState,
+    removeDocumentFromState
+  } = useDocuments();
   const router = useRouter();
+  const params = useParams();
+  const currentDocumentId = params.id as string;
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -43,17 +56,48 @@ export default function AppSidebar() {
     doc.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCreateDocument = async () => {
+  const handleCreateDocument = async (parentId?: string) => {
     if (!user?.id) {
       toast.error('Please sign in to create a document');
       return;
     }
 
     try {
-      const { createDocument } = await import('@/actions/actions');
-      const result = await createDocument(user.id);
-      router.push(`/doc/${result.docId}`);
+      let newDoc;
+      if (parentId) {
+        const { createDocumentInFolder } = await import('@/actions/actions');
+        const result = await createDocumentInFolder(user.id, parentId);
+        newDoc = {
+          id: result.docId,
+          title: "Untitled Document",
+          content: "",
+          type: "document" as const,
+          parent_id: parentId,
+          order_index: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      } else {
+        const { createDocument } = await import('@/actions/actions');
+        const result = await createDocument(user.id);
+        newDoc = {
+          id: result.docId,
+          title: "Untitled Document",
+          content: "",
+          type: "document" as const,
+          parent_id: null,
+          order_index: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      }
+      
+      // Add to local state immediately for real-time update
+      addDocumentToState(newDoc);
+      
+      router.push(`/doc/${newDoc.id}`);
       toast.success('Document created successfully');
+      
       // Close mobile sidebar after creating document
       if (isMobile) {
         setIsMobileOpen(false);
@@ -64,11 +108,35 @@ export default function AppSidebar() {
     }
   };
 
-  const handleDocumentClick = (docId: string) => {
-    router.push(`/doc/${docId}`);
-    // Close mobile sidebar after clicking document
-    if (isMobile) {
-      setIsMobileOpen(false);
+  const handleCreateFolder = async (parentId?: string) => {
+    if (!user?.id) {
+      toast.error('Please sign in to create a folder');
+      return;
+    }
+
+    try {
+      const { createFolder } = await import('@/actions/actions');
+      const result = await createFolder(user.id, parentId);
+      
+      // Create the folder object for local state
+      const newFolder = {
+        id: result.folderId,
+        title: "Untitled Folder",
+        content: "",
+        type: "folder" as const,
+        parent_id: parentId || null,
+        order_index: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add to local state immediately for real-time update
+      addDocumentToState(newFolder);
+      
+      toast.success('Folder created successfully');
+    } catch (error) {
+      console.error('Failed to create folder:', error);
+      toast.error('Failed to create folder. Please try again.');
     }
   };
 
@@ -81,10 +149,45 @@ export default function AppSidebar() {
     try {
       const { deleteDocument } = await import('@/actions/actions');
       await deleteDocument(docId, user.id);
+      
+      // Remove from local state immediately for real-time update
+      removeDocumentFromState(docId);
+      
       toast.success('Document deleted successfully');
-      refetch(); // Refresh the documents list
     } catch (error) {
       toast.error(`Failed to delete document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleRenameDocument = async (docId: string, newTitle: string) => {
+    if (!user?.id) return;
+    
+    try {
+      const { renameDocument } = await import('@/actions/actions');
+      const result = await renameDocument(docId, newTitle, user.id);
+      
+      // Update local state immediately for real-time update
+      updateDocumentInState(result.document);
+      
+      toast.success('Document renamed successfully');
+    } catch (error) {
+      toast.error(`Failed to rename document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleMoveDocument = async (docId: string, newParentId: string | null) => {
+    if (!user?.id) return;
+    
+    try {
+      const { moveDocument } = await import('@/actions/actions');
+      const result = await moveDocument(docId, newParentId, user.id);
+      
+      // Refresh the entire document list to show the new structure
+      refreshDocuments();
+      
+      toast.success('Document moved successfully');
+    } catch (error) {
+      toast.error(`Failed to move document: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -98,6 +201,7 @@ export default function AppSidebar() {
             <span className="font-medium text-sm">
               {user?.user_metadata?.full_name || 'User'}'s
             </span>
+            <span className="font-medium text-sm">Workspace</span>
           </div>
           <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
             <ChevronDown className="h-4 w-4" />
@@ -135,12 +239,34 @@ export default function AppSidebar() {
         </div>
       </div>
 
-      {/* Private Section */}
+      {/* Documents Section */}
       <div className="flex-1 p-3 space-y-3">
         <div className="space-y-1">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2">
-            Private
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2">
+              Documents
+            </h3>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleCreateFolder()}
+                className="h-6 w-6 p-0 hover:bg-accent"
+                title="Create folder"
+              >
+                <FolderPlus className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleCreateDocument()}
+                className="h-6 w-6 p-0 hover:bg-accent"
+                title="Create document"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
           
           {loading ? (
             <div className="flex items-center justify-center py-4">
@@ -155,47 +281,36 @@ export default function AppSidebar() {
                 {searchQuery ? 'No documents found' : 'No documents yet'}
               </p>
               {!searchQuery && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleCreateDocument}
-                  className="mt-2 h-6 text-xs"
-                >
-                  Create your first document
-                </Button>
+                <div className="flex flex-col gap-2 mt-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleCreateDocument()}
+                    className="h-6 text-xs"
+                  >
+                    Create your first document
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleCreateFolder()}
+                    className="h-6 text-xs"
+                  >
+                    Create your first folder
+                  </Button>
+                </div>
               )}
             </div>
           ) : (
-            <div className="space-y-1">
-              {filteredDocuments.map((doc) => (
-                <div key={doc.id} className="group relative">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start text-left h-8 pr-12 hover:bg-accent"
-                    onClick={() => handleDocumentClick(doc.id)}
-                  >
-                    <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
-                    <span className="text-sm truncate">
-                      {doc.title || 'Untitled Document'}
-                    </span>
-                  </Button>
-                  
-                  {/* Delete button - appears on hover */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteDocument(doc.id, doc.title || 'Untitled Document');
-                    }}
-                    className="absolute right-1 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+            <DocumentTree
+              documents={filteredDocuments as DocumentNode[]}
+              onCreateDocument={handleCreateDocument}
+              onCreateFolder={handleCreateFolder}
+              onDeleteDocument={handleDeleteDocument}
+              onRenameDocument={handleRenameDocument}
+              onMoveDocument={handleMoveDocument}
+              currentDocumentId={currentDocumentId}
+            />
           )}
         </div>
 
@@ -210,16 +325,6 @@ export default function AppSidebar() {
             Habit Tracker
           </Button>
         </div>
-
-        {/* Create Document Button */}
-        <Button 
-          onClick={handleCreateDocument}
-          className="w-full h-8 text-sm"
-          disabled={!user}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Document
-        </Button>
       </div>
 
       {/* Shared Section */}

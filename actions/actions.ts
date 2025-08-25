@@ -33,12 +33,33 @@ export async function createDocument(userId: string) {
     
     console.log('Creating document for user:', userId)
 
+    // Get the next order index for root level
+    const { data: rootDocs, error: rootError } = await supabase
+      .from('documents')
+      .select('order_index')
+      .is('parent_id', null)
+      .order('order_index', { ascending: false })
+      .limit(1)
+
+    if (rootError) {
+      console.error('Error fetching root documents:', rootError)
+      throw new Error(`Failed to get order index: ${rootError.message}`)
+    }
+
+    let orderIndex = 0;
+    if (rootDocs && rootDocs.length > 0) {
+      orderIndex = rootDocs[0].order_index + 1
+    }
+
     // Create the document
     const { data: document, error: documentError } = await supabase
       .from('documents')
       .insert({
         title: "Untitled Document",
         content: "", // Ensure content field is set
+        type: "document",
+        parent_id: null,
+        order_index: orderIndex,
       })
       .select()
       .single()
@@ -397,6 +418,325 @@ export async function deleteDocument(documentId: string, userId: string) {
     return { success: true, message: 'Document deleted successfully' }
   } catch (error) {
     console.error('Error in deleteDocument:', error)
+    throw error
+  }
+}
+
+export async function createFolder(userId: string, parentId?: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Creating folder for user:', userId, 'parentId:', parentId)
+
+    // Get the next order index for the parent
+    let orderIndex = 0;
+    if (parentId) {
+      const { data: siblings, error: siblingsError } = await supabase
+        .from('documents')
+        .select('order_index')
+        .eq('parent_id', parentId)
+        .order('order_index', { ascending: false })
+        .limit(1)
+
+      if (siblingsError) {
+        console.error('Error fetching siblings:', siblingsError)
+        throw new Error(`Failed to get order index: ${siblingsError.message}`)
+      }
+
+      if (siblings && siblings.length > 0) {
+        orderIndex = siblings[0].order_index + 1
+      }
+    } else {
+      // Root level - get next order index
+      const { data: rootDocs, error: rootError } = await supabase
+        .from('documents')
+        .select('order_index')
+        .is('parent_id', null)
+        .order('order_index', { ascending: false })
+        .limit(1)
+
+      if (rootError) {
+        console.error('Error fetching root documents:', rootError)
+        throw new Error(`Failed to get order index: ${rootError.message}`)
+      }
+
+      if (rootDocs && rootDocs.length > 0) {
+        orderIndex = rootDocs[0].order_index + 1
+      }
+    }
+
+    // Create the folder
+    const { data: folder, error: folderError } = await supabase
+      .from('documents')
+      .insert({
+        title: "Untitled Folder",
+        content: "",
+        type: "folder",
+        parent_id: parentId || null,
+        order_index: orderIndex,
+      })
+      .select()
+      .single()
+
+    if (folderError) {
+      console.error('Folder creation error:', folderError)
+      throw new Error(`Failed to create folder: ${folderError.message}`)
+    }
+
+    console.log('Folder created:', folder.id)
+
+    // Create user room relationship
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .insert({
+        user_id: userId,
+        room_id: folder.id,
+        role: 'owner',
+      })
+      .select()
+      .single()
+
+    if (userRoomError) {
+      console.error('User room creation error:', userRoomError)
+      // Clean up the folder if user room creation fails
+      await supabase.from('documents').delete().eq('id', folder.id)
+      throw new Error(`Failed to create user room: ${userRoomError.message}`)
+    }
+
+    console.log('User room created successfully:', userRoom)
+
+    return { folderId: folder.id }
+  } catch (error) {
+    console.error('Error in createFolder:', error)
+    throw error
+  }
+}
+
+export async function createDocumentInFolder(userId: string, parentId?: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Creating document in folder for user:', userId, 'parentId:', parentId)
+
+    // Get the next order index for the parent
+    let orderIndex = 0;
+    if (parentId) {
+      const { data: siblings, error: siblingsError } = await supabase
+        .from('documents')
+        .select('order_index')
+        .eq('parent_id', parentId)
+        .order('order_index', { ascending: false })
+        .limit(1)
+
+      if (siblingsError) {
+        console.error('Error fetching siblings:', siblingsError)
+        throw new Error(`Failed to get order index: ${siblingsError.message}`)
+      }
+
+      if (siblings && siblings.length > 0) {
+        orderIndex = siblings[0].order_index + 1
+      }
+    } else {
+      // Root level - get next order index
+      const { data: rootDocs, error: rootError } = await supabase
+        .from('documents')
+        .select('order_index')
+        .is('parent_id', null)
+        .order('order_index', { ascending: false })
+        .limit(1)
+
+      if (rootError) {
+        console.error('Error fetching root documents:', rootError)
+        throw new Error(`Failed to get order index: ${rootError.message}`)
+      }
+
+      if (rootDocs && rootDocs.length > 0) {
+        orderIndex = rootDocs[0].order_index + 1
+      }
+    }
+
+    // Create the document
+    const { data: document, error: documentError } = await supabase
+      .from('documents')
+      .insert({
+        title: "Untitled Document",
+        content: "",
+        type: "document",
+        parent_id: parentId || null,
+        order_index: orderIndex,
+      })
+      .select()
+      .single()
+
+    if (documentError) {
+      console.error('Document creation error:', documentError)
+      throw new Error(`Failed to create document: ${documentError.message}`)
+    }
+
+    console.log('Document created:', document.id)
+
+    // Create user room relationship
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .insert({
+        user_id: userId,
+        room_id: document.id,
+        role: 'owner',
+      })
+      .select()
+      .single()
+
+    if (userRoomError) {
+      console.error('User room creation error:', userRoomError)
+      // Clean up the document if user room creation fails
+      await supabase.from('documents').delete().eq('id', document.id)
+      throw new Error(`Failed to create user room: ${userRoomError.message}`)
+    }
+
+    console.log('User room created successfully:', userRoom)
+
+    return { docId: document.id }
+  } catch (error) {
+    console.error('Error in createDocumentInFolder:', error)
+    throw error
+  }
+}
+
+export async function renameDocument(documentId: string, newTitle: string, userId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Renaming document with ID:', documentId, 'to:', newTitle, 'for user:', userId)
+
+    // First check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', documentId)
+      throw new Error("Access denied to this document")
+    }
+
+    // Update the document title
+    const { data: document, error: documentError } = await supabase
+      .from('documents')
+      .update({ 
+        title: newTitle,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', documentId)
+      .select()
+      .single()
+
+    if (documentError) {
+      console.error('Error updating document title:', documentError)
+      throw new Error(`Failed to update document title: ${documentError.message}`)
+    }
+
+    console.log('Document renamed successfully:', document)
+    return { document }
+  } catch (error) {
+    console.error('Error in renameDocument:', error)
+    throw error
+  }
+}
+
+export async function moveDocument(documentId: string, newParentId: string | null, userId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Moving document with ID:', documentId, 'to parent:', newParentId, 'for user:', userId)
+
+    // First check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', documentId)
+      throw new Error("Access denied to this document")
+    }
+
+    // If moving to a folder, check if user has access to the target folder
+    if (newParentId) {
+      const { data: targetUserRoom, error: targetUserRoomError } = await supabase
+        .from('user_rooms')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('room_id', newParentId)
+        .single()
+
+      if (targetUserRoomError || !targetUserRoom) {
+        console.error('User does not have access to target folder:', newParentId)
+        throw new Error("Access denied to target folder")
+      }
+    }
+
+    // Get the next order index for the new parent
+    let orderIndex = 0;
+    if (newParentId) {
+      const { data: siblings, error: siblingsError } = await supabase
+        .from('documents')
+        .select('order_index')
+        .eq('parent_id', newParentId)
+        .order('order_index', { ascending: false })
+        .limit(1)
+
+      if (siblingsError) {
+        console.error('Error fetching siblings:', siblingsError)
+        throw new Error(`Failed to get order index: ${siblingsError.message}`)
+      }
+
+      if (siblings && siblings.length > 0) {
+        orderIndex = siblings[0].order_index + 1
+      }
+    } else {
+      // Root level - get next order index
+      const { data: rootDocs, error: rootError } = await supabase
+        .from('documents')
+        .select('order_index')
+        .is('parent_id', null)
+        .order('order_index', { ascending: false })
+        .limit(1)
+
+      if (rootError) {
+        console.error('Error fetching root documents:', rootError)
+        throw new Error(`Failed to get order index: ${rootError.message}`)
+      }
+
+      if (rootDocs && rootDocs.length > 0) {
+        orderIndex = rootDocs[0].order_index + 1
+      }
+    }
+
+    // Update the document
+    const { data: document, error: documentError } = await supabase
+      .from('documents')
+      .update({ 
+        parent_id: newParentId,
+        order_index: orderIndex,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', documentId)
+      .select()
+      .single()
+
+    if (documentError) {
+      console.error('Error moving document:', documentError)
+      throw new Error(`Failed to move document: ${documentError.message}`)
+    }
+
+    console.log('Document moved successfully:', document)
+    return { document }
+  } catch (error) {
+    console.error('Error in moveDocument:', error)
     throw error
   }
 }

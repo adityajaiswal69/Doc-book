@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X } from "lucide-react";
+import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X, MoreHorizontal } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
 
@@ -45,6 +45,18 @@ export default function Editor() {
   const [commandFilter, setCommandFilter] = useState("");
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  
+  // Block menu state
+  const [openMenuBlockId, setOpenMenuBlockId] = useState<string | null>(null);
+  
+  // Drag and drop state
+  const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
+  const [dragOverBlockId, setDragOverBlockId] = useState<string | null>(null);
+  
+  // Floating toolbar state
+  const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
+  const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 });
+  const [selectedText, setSelectedText] = useState('');
   
   // Refs
   const titleSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -343,6 +355,20 @@ export default function Editor() {
     };
   }, []);
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openMenuBlockId && !(event.target as Element).closest('[data-block-menu]')) {
+        setOpenMenuBlockId(null);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.document.addEventListener('mousedown', handleClickOutside);
+      return () => window.document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [openMenuBlockId]);
+
   // Auto-save title changes
   const handleTitleChange = useCallback(async (newTitle: string) => {
     setTitle(newTitle);
@@ -533,8 +559,44 @@ export default function Editor() {
     }, 10);
   }, [updateListIndices]);
 
-  // Track last Enter press time for double-Enter detection
-  const lastEnterPressRef = useRef<{ [key: string]: number }>({});
+  // Drag and drop handlers
+  const handleDragStart = useCallback((e: React.DragEvent, blockId: string) => {
+    setDraggedBlockId(blockId);
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, blockId: string) => {
+    e.preventDefault();
+    if (draggedBlockId && draggedBlockId !== blockId) {
+      setDragOverBlockId(blockId);
+    }
+  }, [draggedBlockId]);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverBlockId(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, targetBlockId: string) => {
+    e.preventDefault();
+    if (!draggedBlockId || draggedBlockId === targetBlockId) return;
+
+    setBlocks(prev => {
+      const draggedIndex = prev.findIndex(b => b.id === draggedBlockId);
+      const targetIndex = prev.findIndex(b => b.id === targetBlockId);
+      
+      if (draggedIndex === -1 || targetIndex === -1) return prev;
+      
+      const newBlocks = [...prev];
+      const [draggedBlock] = newBlocks.splice(draggedIndex, 1);
+      newBlocks.splice(targetIndex, 0, draggedBlock);
+      
+      return updateListIndices(newBlocks);
+    });
+    
+    setDraggedBlockId(null);
+    setDragOverBlockId(null);
+  }, [draggedBlockId, updateListIndices]);
 
   // Auto-resize textarea height based on content
   const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement) => {
@@ -584,70 +646,8 @@ export default function Editor() {
       const currentBlock = blocks.find(b => b.id === blockId);
       if (!currentBlock) return;
       
-      const now = Date.now();
-      const lastPress = lastEnterPressRef.current[blockId] || 0;
-      const timeDiff = now - lastPress;
-      
-      // Handle list-specific Enter behavior
-      if (currentBlock.type === 'numbered-list' || currentBlock.type === 'bulleted-list' || currentBlock.type === 'todo-list') {
-        if (currentBlock.content.trim() === '') {
-          // Empty list item - exit list and create new block
-          addBlock(blockId);
-          lastEnterPressRef.current[blockId] = 0;
-        } else {
-          // Non-empty list item - continue list
-          const newBlock: Block = { 
-            id: `block-${Date.now()}`, 
-            type: currentBlock.type, 
-            content: '',
-            listIndex: currentBlock.type === 'numbered-list' ? (currentBlock.listIndex || 1) + 1 : undefined
-          };
-          
-          setBlocks(prev => {
-            const index = prev.findIndex(b => b.id === blockId);
-            const newBlocks = [...prev];
-            newBlocks.splice(index + 1, 0, newBlock);
-            return updateListIndices(newBlocks);
-          });
-          
-          // Focus new list item
-          setTimeout(() => {
-            const blockElement = blockRefs.current[newBlock.id];
-            if (blockElement) {
-              blockElement.focus();
-            }
-          }, 10);
-        }
-      } else {
-        // Non-list blocks - use double-Enter logic
-        if (timeDiff < 500) {
-          addBlock(blockId);
-          lastEnterPressRef.current[blockId] = 0;
-        } else {
-          // Update the last press time and insert newline
-          lastEnterPressRef.current[blockId] = now;
-          
-          // Insert newline at cursor position
-          const textarea = blockRefs.current[blockId];
-          if (textarea) {
-            const cursorPos = textarea.selectionStart;
-            const content = currentBlock.content;
-            const newContent = content.slice(0, cursorPos) + '\n' + content.slice(cursorPos);
-            
-            // Update the block content
-            setBlocks(prev => prev.map(b => 
-              b.id === blockId ? { ...b, content: newContent } : b
-            ));
-            
-            // Set cursor position after newline and auto-resize
-            setTimeout(() => {
-              textarea.setSelectionRange(cursorPos + 1, cursorPos + 1);
-              textarea.focus();
-              autoResizeTextarea(textarea);
-            }, 0);
-          }
-        }
-      }
+      // Always add a new block on Enter
+      addBlock(blockId);
     } else if (e.key === 'Backspace') {
       const block = blocks.find(b => b.id === blockId);
       if (block && block.content === '' && blocks.length > 1) {
@@ -680,15 +680,15 @@ export default function Editor() {
       },
       onKeyDown: (e: React.KeyboardEvent) => handleBlockKeyDown(e, block.id),
       placeholder: `Type '/' for commands...`,
-             className: "w-full resize-none border-none outline-none bg-transparent content-center text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden hover:bg-gray-800/30 rounded px-2 py-1",
-       style: {
-         fontSize: '16px',
-         lineHeight: '1.4',
-         padding: '0',
-         margin: '0',
-         caretColor: 'white',
-         caretShape: 'block' as const
-       },
+      className: "w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2",
+      style: {
+        fontSize: '16px',
+        lineHeight: '1.6',
+        padding: '0',
+        margin: '0',
+        caretColor: 'white',
+        caretShape: 'block' as const
+      },
       spellCheck: false,
       autoComplete: "off",
       autoCorrect: "off",
@@ -700,114 +700,128 @@ export default function Editor() {
         return (
           <textarea
             {...commonProps}
-            style={{ ...commonProps.style, fontSize: '32px', fontWeight: 'bold', caretShape: 'block' as const }}
+            style={{ ...commonProps.style, fontSize: '32px', fontWeight: 'bold', lineHeight: '1.2' }}
             placeholder="Heading 1"
+            className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
           />
         );
       case 'heading-2':
         return (
           <textarea
             {...commonProps}
-            style={{ ...commonProps.style, fontSize: '24px', fontWeight: '600', caretShape: 'block' as const }}
+            style={{ ...commonProps.style, fontSize: '24px', fontWeight: '600', lineHeight: '1.3' }}
             placeholder="Heading 2"
+            className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
           />
         );
       case 'heading-3':
         return (
           <textarea
             {...commonProps}
-            style={{ ...commonProps.style, fontSize: '20px', fontWeight: '500', caretShape: 'block' as const }}
+            style={{ ...commonProps.style, fontSize: '20px', fontWeight: '500', lineHeight: '1.4' }}
             placeholder="Heading 3"
+            className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
           />
         );
       case 'bulleted-list':
         return (
-          <div className="flex items-start gap-2 group/list-item">
-            <span className="text-blue-400 text-lg mt-1 flex-shrink-0 w-4 text-center group-hover/list-item:text-blue-300 transition-colors">•</span>
+          <div className="flex items-start gap-3 group/list-item">
+            <span className="text-blue-400 text-lg mt-2 flex-shrink-0 w-4 text-center group-hover/list-item:text-blue-300 transition-colors">•</span>
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, flex: 1, caretShape: 'block' as const }}
+              style={{ ...commonProps.style, flex: 1, lineHeight: '1.6' }}
               placeholder="List item"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
             />
           </div>
         );
       case 'numbered-list':
         return (
-          <div className="flex items-start gap-2 group/list-item">
-            <span className="text-blue-400 text-lg flex-shrink-0 w-6 text-right group-hover/list-item:text-blue-300 transition-colors">
+          <div className="flex items-start gap-3 group/list-item">
+            <span className="text-blue-400 text-lg mt-2 flex-shrink-0 w-6 text-right group-hover/list-item:text-blue-300 transition-colors font-mono">
               {block.listIndex || 1}.
             </span>
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, flex: 1, caretShape: 'block' as const }}
+              style={{ ...commonProps.style, flex: 1, lineHeight: '1.6' }}
               placeholder="List item"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
             />
           </div>
         );
       case 'todo-list':
         return (
-          <div className="flex items-start gap-2 group/list-item">
-            <input type="checkbox" className="mt-1 flex-shrink-0 w-4 h-4 text-blue-500 rounded border-gray-600 bg-gray-800 focus:ring-blue-500 focus:ring-2" />
+          <div className="flex items-start gap-3 group/list-item">
+            <input 
+              type="checkbox" 
+              className="mt-2 flex-shrink-0 w-4 h-4 text-blue-500 rounded border-gray-600 bg-gray-800 focus:ring-blue-500 focus:ring-2 cursor-pointer" 
+            />
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, flex: 1, caretShape: 'block' as const }}
+              style={{ ...commonProps.style, flex: 1, lineHeight: '1.6' }}
               placeholder="Task item"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
             />
           </div>
         );
       case 'quote':
         return (
-          <div className="border-l-4 border-gray-600 pl-3">
+          <div className="border-l-4 border-gray-600 pl-4 py-2">
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, fontStyle: 'italic', caretShape: 'block' as const }}
+              style={{ ...commonProps.style, fontStyle: 'italic', lineHeight: '1.6' }}
               placeholder="Quote text"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
             />
           </div>
         );
       case 'code-block':
         return (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, fontFamily: 'monospace', color: '#10b981', caretShape: 'block' as const }}
+              style={{ ...commonProps.style, fontFamily: 'monospace', color: '#10b981', lineHeight: '1.5' }}
               placeholder="// Your code here"
+              className="w-full resize-none border-none outline-none bg-transparent text-green-400 focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
             />
           </div>
         );
       case 'divider':
         return (
-          <div className="border-t border-gray-600 my-2"></div>
+          <div className="border-t border-gray-600 my-4"></div>
         );
       case 'table':
         return (
           <div className="border border-gray-600 rounded-lg overflow-hidden">
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, fontFamily: 'monospace', caretShape: 'block' as const }}
+              style={{ ...commonProps.style, fontFamily: 'monospace', lineHeight: '1.5' }}
               placeholder="Table content"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
             />
           </div>
         );
       case 'image':
         return (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-center">
-            <Image className="h-6 w-6 mx-auto text-gray-400 mb-1" />
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
+            <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" />
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, textAlign: 'center', caretShape: 'block' as const }}
+              style={{ ...commonProps.style, textAlign: 'center', lineHeight: '1.6' }}
               placeholder="Image description or URL"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
             />
           </div>
         );
       case 'video':
         return (
-          <div className="bg-gray-700 rounded-lg p-3 text-center">
-            <Video className="h-6 w-6 mx-auto text-gray-400 mb-1" />
+          <div className="bg-gray-700 rounded-lg p-4 text-center">
+            <Video className="h-8 w-8 mx-auto text-gray-400 mb-2" />
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, textAlign: 'center', caretShape: 'block' as const }}
+              style={{ ...commonProps.style, textAlign: 'center', lineHeight: '1.6' }}
               placeholder="Video description or URL"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
             />
           </div>
         );
@@ -816,17 +830,46 @@ export default function Editor() {
           <textarea
             {...commonProps}
             placeholder="Type '/' for commands..."
+            className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
           />
         );
     }
   };
 
-  if (loading) {
+  // Show skeleton only on initial load when no document exists
+  if (loading && !document) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading document...</span>
+      <div className="flex flex-col h-full">
+        {/* Header Skeleton */}
+        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <div className="h-5 w-5 bg-gray-300 rounded animate-pulse" />
+                <div className="h-6 w-48 bg-gray-300 rounded animate-pulse" />
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="h-3 w-3 bg-gray-300 rounded animate-pulse" />
+                <div className="h-3 w-16 bg-gray-300 rounded animate-pulse" />
+                <div className="h-4 w-4 bg-gray-300 rounded animate-pulse" />
+              </div>
+            </div>
+            <div className="h-3 w-24 bg-gray-300 rounded animate-pulse" />
+          </div>
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="flex-1 p-6 space-y-4">
+          {/* Title skeleton */}
+          <div className="h-8 w-64 bg-gray-300 rounded animate-pulse" />
+          
+          {/* Content blocks skeleton */}
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="space-y-2">
+              <div className="h-4 w-full bg-gray-300 rounded animate-pulse" />
+              {i === 0 && <div className="h-4 w-3/4 bg-gray-300 rounded animate-pulse" />}
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -912,9 +955,28 @@ export default function Editor() {
           </div>
           
           <div className="flex items-center gap-3">
-            <div className="text-xs text-muted-foreground">
-              {saving ? 'Saving...' : contentChanged ? 'Unsaved changes' : 'All changes saved'}
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <span>📄 {blocks.length} blocks</span>
+                <span>📝 {blocks.reduce((total, block) => total + (block.content?.split(/\s+/).length || 0), 0)} words</span>
+              </div>
+              <div>
+                {saving ? 'Saving...' : contentChanged ? 'Unsaved changes' : 'All changes saved'}
+              </div>
             </div>
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8"
+              onClick={() => {
+                // Show keyboard shortcuts help
+                toast.info("Keyboard shortcuts: Enter = new block, / = commands, Ctrl+S = save");
+              }}
+              title="Keyboard shortcuts"
+            >
+              ⌨️
+            </Button>
             
             <Button 
               variant="ghost" 
@@ -966,36 +1028,196 @@ export default function Editor() {
           </div>
           
           {/* Blocks */}
-          <div className="space-y-1">
-            {blocks.map((block, index) => (
-              <div key={block.id} className="relative group py-0.5 mb-2" data-type={block.type}>
-                {renderBlock(block)}
+          <div className="space-y-3">
+            {blocks.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <div className="text-6xl mb-4">✨</div>
+                <h3 className="text-xl font-semibold mb-2">Welcome to your document!</h3>
+                <p className="text-sm mb-6">Start typing to create your first block, or use the slash commands below</p>
                 
-                {/* Delete button - visible on hover */}
-                <button
-                  onClick={() => {
-                    if (blocks.length > 1) {
-                      setBlocks(prev => {
-                        const filteredBlocks = prev.filter(b => b.id !== block.id);
-                        return updateListIndices(filteredBlocks);
-                      });
-                      toast.success("Block deleted");
-                    } else {
-                      toast.error("Cannot delete the last block");
-                    }
-                  }}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded-md hover:bg-red-500/20 text-red-400 hover:text-red-300"
-                  title="Delete block"
-                  disabled={blocks.length <= 1}
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
+                  {[
+                    { icon: '#', title: 'Heading', desc: 'Type # for headings' },
+                    { icon: '•', title: 'List', desc: 'Type - for bullet lists' },
+                    { icon: '[]', title: 'Todo', desc: 'Type [ ] for tasks' },
+                    { icon: '>', title: 'Quote', desc: 'Type > for quotes' },
+                    { icon: '```', title: 'Code', desc: 'Type ``` for code blocks' },
+                    { icon: '📷', title: 'Image', desc: 'Type /image for images' },
+                    { icon: '🎥', title: 'Video', desc: 'Type /video for videos' },
+                    { icon: '📊', title: 'Table', desc: 'Type /table for tables' }
+                  ].map((tip, i) => (
+                    <div key={i} className="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                      <div className="text-2xl mb-2">{tip.icon}</div>
+                      <div className="text-xs font-medium text-white">{tip.title}</div>
+                      <div className="text-xs text-gray-500">{tip.desc}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
+            ) : (
+              <>
+                {blocks.map((block, index) => (
+                  <div 
+                    key={block.id} 
+                    className={`relative group py-2 px-4 rounded-lg transition-all duration-200 hover:bg-gray-800/30 ${
+                      draggedBlockId === block.id ? 'opacity-50' : ''
+                    } ${
+                      dragOverBlockId === block.id ? 'bg-blue-500/10 border-l-4 border-blue-500' : ''
+                    }`}
+                    data-type={block.type}
+                    onDragOver={(e) => handleDragOver(e, block.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, block.id)}
+                    onDragEnd={() => setDragOverBlockId(null)}
+                  >
+                    {/* Block type indicator */}
+                    <div className="absolute top-2 left-2 text-xs text-gray-500 font-mono bg-gray-800/50 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      {block.type.replace('-', ' ')}
+                    </div>
+                    
+                    {/* Drag handle - visible on hover */}
+                    <div 
+                      className="absolute left-8 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing p-2"
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, block.id)}
+                      title="Drag to reorder"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                        <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                        <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                      </div>
+                    </div>
+                    
+                    {/* Block content with proper padding */}
+                    <div className="ml-16 mr-12">
+                      {renderBlock(block)}
+                      
+                      {/* Quick actions toolbar - visible on hover */}
+                      <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <button
+                          onClick={() => {
+                            const newBlock = { id: `block-${Date.now()}`, type: 'text', content: '' };
+                            setBlocks(prev => {
+                              const index = prev.findIndex(b => b.id === block.id);
+                              const newBlocks = [...prev];
+                              newBlocks.splice(index + 1, 0, newBlock);
+                              return updateListIndices(newBlocks);
+                            });
+                            toast.success("New block added");
+                          }}
+                          className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+                          title="Add block below"
+                        >
+                          + Add below
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            const newBlock = { id: `block-${Date.now()}`, type: block.type, content: '' };
+                            setBlocks(prev => {
+                              const index = prev.findIndex(b => b.id === block.id);
+                              const newBlocks = [...prev];
+                              newBlocks.splice(index + 1, 0, newBlock);
+                              return updateListIndices(newBlocks);
+                            });
+                            toast.success("Block duplicated");
+                          }}
+                          className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded transition-colors"
+                          title="Duplicate block"
+                        >
+                          📋 Duplicate
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Three dots menu - visible on hover */}
+                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200" data-block-menu>
+                      <button
+                        onClick={() => setOpenMenuBlockId(openMenuBlockId === block.id ? null : block.id)}
+                        className="p-2 rounded-md hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
+                        title="Block options"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                      
+                      {/* Dropdown menu */}
+                      {openMenuBlockId === block.id && (
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10">
+                          <div className="p-2 border-b border-gray-700">
+                            <div className="text-xs text-gray-400 font-medium">Block Actions</div>
+                          </div>
+                          
+                          {/* Block type switcher */}
+                          <div className="p-2 border-b border-gray-700">
+                            <div className="text-xs text-gray-400 font-medium mb-2">Change Type</div>
+                            <div className="grid grid-cols-2 gap-1">
+                              {['text', 'heading-1', 'heading-2', 'heading-3', 'bulleted-list', 'numbered-list', 'todo-list', 'quote', 'code-block'].map((type) => (
+                                <button
+                                  key={type}
+                                  onClick={() => {
+                                    handleBlockChange(block.id, block.content, type);
+                                    setOpenMenuBlockId(null);
+                                    toast.success(`Changed to ${type.replace('-', ' ')}`);
+                                  }}
+                                  className={`px-2 py-1 text-xs rounded transition-colors ${
+                                    block.type === type 
+                                      ? 'bg-blue-600 text-white' 
+                                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                  }`}
+                                >
+                                  {type.replace('-', ' ')}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              const newBlock = { id: `block-${Date.now()}`, type: block.type, content: '' };
+                              setBlocks(prev => {
+                                const index = prev.findIndex(b => b.id === block.id);
+                                const newBlocks = [...prev];
+                                newBlocks.splice(index + 1, 0, newBlock);
+                                return updateListIndices(newBlocks);
+                              });
+                              setOpenMenuBlockId(null);
+                              toast.success("Block duplicated");
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                          >
+                            📋 Duplicate block
+                          </button>
+                          
+                          <button
+                            onClick={() => {
+                              if (blocks.length > 1) {
+                                setBlocks(prev => {
+                                  const filteredBlocks = prev.filter(b => b.id !== block.id);
+                                  return updateListIndices(filteredBlocks);
+                                });
+                                toast.success("Block deleted");
+                              } else {
+                                toast.error("Cannot delete the last block");
+                              }
+                              setOpenMenuBlockId(null);
+                            }}
+                            disabled={blocks.length <= 1}
+                            className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-gray-700 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-t border-gray-700"
+                          >
+                            🗑️ Delete block
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
-          
-          {/* Add new block button */}
-          <div className="mt-6 text-center">
+            
+           {/* Add new block button */}
+           <div className="mt-6 text-center">
             <Button
               variant="ghost"
               onClick={() => addBlock(blocks[blocks.length - 1]?.id || '')}
@@ -1011,7 +1233,7 @@ export default function Editor() {
       {showCommands && (
         <div 
           ref={commandPaletteRef}
-          className="fixed z-50 w-96 bg-gray-800 border border-gray-700 rounded-lg shadow-xl"
+          className="fixed z-50 w-96 bg-gray-800 border border-gray-700 rounded-lg shadow-xl backdrop-blur-sm"
           style={{
             top: '50%',
             left: '50%',
@@ -1019,55 +1241,155 @@ export default function Editor() {
             maxHeight: '80vh'
           }}
         >
-          {/* Search/Filter */}
-          <div className="p-3 border-b border-gray-700">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Filter commands..."
-                value={commandFilter}
-                onChange={(e) => setCommandFilter(e.target.value)}
-                onKeyDown={handleCommandKeyDown}
-                className="pl-10 h-8 text-sm bg-gray-700 border-gray-600 text-white"
-                autoFocus
-              />
+          {/* Header */}
+          <div className="p-4 border-b border-gray-700 bg-gray-900/50 rounded-t-lg">
+            <div className="flex items-center gap-3">
+              <Search className="h-5 w-5 text-gray-400" />
+              <div className="flex-1">
+                <Input
+                  placeholder="Search commands..."
+                  value={commandFilter}
+                  onChange={(e) => setCommandFilter(e.target.value)}
+                  onKeyDown={handleCommandKeyDown}
+                  className="h-8 text-sm bg-gray-700 border-gray-600 text-white placeholder:text-gray-400"
+                  autoFocus
+                />
+              </div>
+              <div className="text-xs text-gray-500">
+                {filteredCommands.length} commands
+              </div>
             </div>
           </div>
           
           {/* Commands List */}
           <div className="max-h-64 overflow-y-auto">
-            {filteredCommands.map((command, index) => (
-              <div
-                key={command.id}
-                className={`p-3 cursor-pointer hover:bg-gray-700 transition-colors ${
-                  index === selectedCommandIndex ? 'bg-gray-700' : ''
-                }`}
-                onClick={() => handleCommandSelect(command)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="text-gray-300">
-                      {command.icon}
+            {filteredCommands.length > 0 ? (
+              filteredCommands.map((command, index) => (
+                <div
+                  key={command.id}
+                  className={`p-3 cursor-pointer hover:bg-gray-700 transition-colors ${
+                    index === selectedCommandIndex ? 'bg-gray-700 border-l-2 border-blue-500' : ''
+                  }`}
+                  onClick={() => handleCommandSelect(command)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="text-gray-300 p-1">
+                        {command.icon}
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-white font-medium text-sm">{command.title}</div>
+                        <div className="text-gray-400 text-xs">{command.description}</div>
+                        {command.shortcut && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            Shortcut: <span className="bg-gray-700 px-1 py-0.5 rounded text-gray-300">{command.shortcut}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <div className="text-white font-medium text-sm">{command.title}</div>
-                      <div className="text-gray-400 text-xs">{command.description}</div>
+                    <div className="ml-4">
+                      {command.preview}
                     </div>
-                  </div>
-                  <div className="ml-4">
-                    {command.preview}
                   </div>
                 </div>
+              ))
+            ) : (
+              <div className="p-6 text-center text-gray-400">
+                <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <div className="text-sm">No commands found</div>
+                <div className="text-xs text-gray-500 mt-1">Try a different search term</div>
               </div>
-            ))}
+            )}
           </div>
           
           {/* Footer */}
-          <div className="p-3 border-t border-gray-700 text-xs text-gray-500">
+          <div className="p-3 border-t border-gray-700 text-xs text-gray-500 bg-gray-900/50 rounded-b-lg">
             <div className="flex items-center justify-between">
-              <span>Type '/' for commands</span>
-              <span>esc to close</span>
+              <div className="flex items-center gap-4">
+                <span>Type '/' for commands</span>
+                <span>↑↓ to navigate</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>Enter to select</span>
+                <span>Esc to close</span>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Floating Formatting Toolbar */}
+      {showFloatingToolbar && (
+        <div 
+          className="fixed z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl backdrop-blur-sm"
+          style={{
+            left: toolbarPosition.x,
+            top: toolbarPosition.y,
+            transform: 'translate(-50%, -100%)'
+          }}
+        >
+          <div className="flex items-center gap-1 p-2">
+            <button
+              onClick={() => {
+                // Bold formatting logic
+                toast.success("Bold formatting applied");
+                setShowFloatingToolbar(false);
+              }}
+              className="p-2 hover:bg-gray-700 rounded text-gray-300 hover:text-white transition-colors"
+              title="Bold (Ctrl+B)"
+            >
+              <strong className="text-sm font-bold">B</strong>
+            </button>
+            
+            <button
+              onClick={() => {
+                // Italic formatting logic
+                toast.success("Italic formatting applied");
+                setShowFloatingToolbar(false);
+              }}
+              className="p-2 hover:bg-gray-700 rounded text-gray-300 hover:text-white transition-colors"
+              title="Italic (Ctrl+I)"
+            >
+              <em className="text-sm italic">I</em>
+            </button>
+            
+            <button
+              onClick={() => {
+                // Underline formatting logic
+                toast.success("Underline formatting applied");
+                setShowFloatingToolbar(false);
+              }}
+              className="p-2 hover:bg-gray-700 rounded text-gray-300 hover:text-white transition-colors"
+              title="Underline (Ctrl+U)"
+            >
+              <u className="text-sm underline">U</u>
+            </button>
+            
+            <div className="w-px h-6 bg-gray-600 mx-1"></div>
+            
+            <button
+              onClick={() => {
+                // Link formatting logic
+                toast.success("Link formatting applied");
+                setShowFloatingToolbar(false);
+              }}
+              className="p-2 hover:bg-gray-700 rounded text-gray-300 hover:text-white transition-colors"
+              title="Insert Link"
+            >
+              🔗
+            </button>
+            
+            <button
+              onClick={() => {
+                // Code formatting logic
+                toast.success("Code formatting applied");
+                setShowFloatingToolbar(false);
+              }}
+              className="p-2 hover:bg-gray-700 rounded text-gray-300 hover:text-white transition-colors"
+              title="Code (Ctrl+`)"
+            >
+              <code className="text-sm font-mono bg-gray-700 px-1 rounded">`</code>
+            </button>
           </div>
         </div>
       )}

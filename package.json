@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "migrate:hierarchical": "node run-hierarchical-migration.js",
+    "test:hierarchical": "node test-hierarchical.js",
+    "test:dragdrop": "node test-drag-drop.js"
   },
   "dependencies": {
     "@blocknote/core": "^0.21.0",
