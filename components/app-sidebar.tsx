@@ -26,13 +26,15 @@ import {
   ChevronDown,
   Edit3,
   Lock,
-  FolderPlus
+  FolderPlus,
+  Share2  
 } from "lucide-react";
 import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import DocumentTree from "./DocumentTree";
 import { DocumentNode } from "@/types/database";
+import ShareButton from "./ShareButton";
 
 export default function AppSidebar() {
   const { user, signOut } = useAuth();
@@ -191,6 +193,28 @@ export default function AppSidebar() {
     }
   };
 
+  const handleSharingChange = async (docId: string, isPublic: boolean, shareChildren: boolean) => {
+    if (!user?.id) return;
+    
+    try {
+      // Find the document in the current state and update it
+      const updatedDocument = documents.find(doc => doc.id === docId);
+      if (updatedDocument) {
+        const newDoc = {
+          ...updatedDocument,
+          is_public: isPublic,
+          share_children: shareChildren
+        };
+        updateDocumentInState(newDoc);
+      }
+      
+      // Refresh documents to get the latest preview token
+      refreshDocuments();
+    } catch (error) {
+      console.error('Error handling sharing change:', error);
+    }
+  };
+
   const sidebarContent = (
     <div className="bg-background border-r flex flex-col h-full w-64">
       {/* User Profile Header */}
@@ -265,6 +289,8 @@ export default function AppSidebar() {
               >
                 <Plus className="h-3 w-3" />
               </Button>
+              
+                
             </div>
           </div>
           
@@ -309,6 +335,7 @@ export default function AppSidebar() {
               onDeleteDocument={handleDeleteDocument}
               onRenameDocument={handleRenameDocument}
               onMoveDocument={handleMoveDocument}
+              onSharingChange={handleSharingChange}
               currentDocumentId={currentDocumentId}
             />
           )}

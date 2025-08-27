@@ -3,6 +3,13 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   FileText, 
   Folder, 
@@ -18,6 +25,7 @@ import {
 import { DocumentNode } from "@/types/database";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import SidebarShareButton from "@/components/SidebarShareButton";
 
 interface DocumentTreeProps {
   documents: DocumentNode[];
@@ -26,6 +34,7 @@ interface DocumentTreeProps {
   onDeleteDocument: (id: string, title: string) => void;
   onRenameDocument: (id: string, newTitle: string) => void;
   onMoveDocument?: (docId: string, newParentId: string | null) => void;
+  onSharingChange?: (docId: string, isPublic: boolean, shareChildren: boolean) => void;
   currentDocumentId?: string;
 }
 
@@ -36,6 +45,7 @@ export default function DocumentTree({
   onDeleteDocument,
   onRenameDocument,
   onMoveDocument,
+  onSharingChange,
   currentDocumentId
 }: DocumentTreeProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -273,52 +283,77 @@ export default function DocumentTree({
 
           {/* Actions */}
           <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-            {doc.type === 'folder' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCreateFolder(doc.id);
-                }}
-                className="h-6 w-6 p-0 hover:bg-accent"
-              >
-                <FolderPlus className="h-3 w-3" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCreateDocument(doc.type === 'folder' ? doc.id : undefined);
+            {/* Share Button for both folders and documents */}
+            <SidebarShareButton
+              documentId={doc.id}
+              title={doc.title || "Untitled"}
+              documentType={doc.type}
+              isPublic={doc.is_public || false}
+              shareChildren={doc.share_children || false}
+              previewToken={doc.preview_token || ""}
+              onSharingChange={(isPublic, shareChildren) => {
+                if (onSharingChange) {
+                  onSharingChange(doc.id, isPublic, shareChildren);
+                }
               }}
-              className="h-6 w-6 p-0 hover:bg-accent"
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                startEditing(doc);
-              }}
-              className="h-6 w-6 p-0 hover:bg-accent"
-            >
-              <Edit3 className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteDocument(doc.id, doc.title || 'Untitled');
-              }}
-              className="h-6 w-6 p-0 hover:bg-accent text-red-500 hover:text-red-700"
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-accent"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {doc.type === 'folder' && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCreateFolder(doc.id);
+                      }}
+                    >
+                      <FolderPlus className="h-4 w-4 mr-2" />
+                      Create folder
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCreateDocument(doc.type === 'folder' ? doc.id : undefined);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create document
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startEditing(doc);
+                  }}
+                >
+                  <Edit3 className="h-4 w-4 mr-2" />
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteDocument(doc.id, doc.title || 'Untitled');
+                  }}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

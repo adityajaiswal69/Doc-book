@@ -98,4 +98,12 @@ export interface DocumentNode {
   order_index: number
   children?: DocumentNode[]
   isExpanded?: boolean
+  // Sharing properties
+  is_public?: boolean
+  share_children?: boolean
+  preview_token?: string
+  // Additional properties that may be needed
+  content?: string
+  created_at?: string
+  updated_at?: string
 }

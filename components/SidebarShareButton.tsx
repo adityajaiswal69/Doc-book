@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { toggleDocumentSharing } from "@/actions/actions";
 import { useAuth } from "@/components/auth/AuthProvider";
 
-interface ShareButtonProps {
+interface SidebarShareButtonProps {
   documentId: string;
   title?: string;
   isPublic?: boolean;
@@ -27,19 +27,17 @@ interface ShareButtonProps {
   previewToken?: string;
   documentType: 'document' | 'folder';
   onSharingChange?: (isPublic: boolean, shareChildren: boolean) => void;
-  variant?: 'default' | 'compact';
 }
 
-export default function ShareButton({
+export default function SidebarShareButton({
   documentId,
   title = "Untitled",
   isPublic = false,
   shareChildren = false,
   previewToken,
   documentType,
-  onSharingChange,
-  variant = 'default'
-}: ShareButtonProps) {
+  onSharingChange
+}: SidebarShareButtonProps) {
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [isPublicState, setIsPublicState] = useState(isPublic);
   const [shareChildrenState, setShareChildrenState] = useState(shareChildren);
@@ -70,7 +68,7 @@ export default function ShareButton({
       if (showShareDialog) {
         const target = e.target as Element;
         // Check if click is outside the dialog
-        if (!target.closest('[data-share-dialog]')) {
+        if (!target.closest('[data-sidebar-share-dialog]')) {
           setShowShareDialog(false);
         }
       }
@@ -183,19 +181,15 @@ export default function ShareButton({
   const shareUrl = previewToken ? `${window.location.origin}/preview/${previewToken}` : '';
 
   return (
-    <div className="relative inline-block" data-share-dialog>
+    <div className="relative inline-block" data-sidebar-share-dialog>
       <Button
-        variant={variant === 'compact' ? 'ghost' : 'outline'}
-        size={variant === 'compact' ? 'sm' : 'sm'}
+        variant="ghost"
+        size="sm"
         onClick={() => setShowShareDialog(true)}
-        className={variant === 'compact' 
-          ? "h-6 w-6 p-0 hover:bg-accent" 
-          : "flex items-center space-x-2"
-        }
+        className="h-6 w-6 p-0 hover:bg-accent"
         title="Share document"
       >
-        <Share2 className={variant === 'compact' ? "h-3 w-3" : "h-4 w-4"} />
-        {variant === 'default' && <span>Share</span>}
+        <Share2 className="h-3 w-3" />
       </Button>
 
       {showShareDialog && (
@@ -206,121 +200,122 @@ export default function ShareButton({
             onClick={() => setShowShareDialog(false)}
           />
           
-          {/* Dropdown positioned below button */}
-          <div className="absolute top-full right-0 mt-2 z-[9999] w-96 sm:w-[28rem] max-w-[95vw] sm:left-auto sm:right-0">
-            {/* Arrow pointing up */}
-            <div className="absolute -top-2 right-4 w-4 h-4 bg-background border-l-2 border-t-2 border-border rotate-45 transform"></div>
-            <Card className="w-full animate-in fade-in-0 zoom-in-95 duration-200 shadow-2xl border-2 bg-background overflow-visible min-h-fit">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-semibold">Public sharing</CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowShareDialog(false)}
-                className="h-8 w-8 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
+          {/* Sidebar-specific positioned dialog */}
+          <div className="absolute left-full top-0 ml-2 z-[9999] w-96 max-w-[calc(100vw-320px)]">
+            {/* Arrow pointing left */}
+            <div className="absolute left-0 top-4 transform -translate-x-2 w-4 h-4 bg-background border-l-2 border-b-2 border-border rotate-45"></div>
             
-            <CardContent className="space-y-4 p-4">
-              {/* Document Info */}
-              <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
-                {documentType === 'folder' ? (
-                  <Folder className="h-5 w-5 text-blue-500" />
-                ) : (
-                  <FileText className="h-5 w-5 text-gray-500" />
-                )}
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium">
-                    {title}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {documentType === 'folder' ? 'Folder' : 'Document'}
-                  </span>
+            <Card className="w-full animate-in fade-in-0 zoom-in-95 duration-200 shadow-2xl border-2 bg-background">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-lg font-semibold">Public sharing</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowShareDialog(false)}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </CardHeader>
+              
+              <CardContent className="space-y-4 p-4">
+                {/* Document Info */}
+                <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
+                  {documentType === 'folder' ? (
+                    <Folder className="h-5 w-5 text-blue-500" />
+                  ) : (
+                    <FileText className="h-5 w-5 text-gray-500" />
+                  )}
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">
+                      {title}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {documentType === 'folder' ? 'Folder' : 'Document'}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Public Sharing Toggle */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-sm font-medium">Public sharing</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Anyone with the link can view this {documentType}
-                  </p>
-                </div>
-                <Switch
-                  checked={isPublicState}
-                  onCheckedChange={handleToggleSharing}
-                  disabled={isLoading}
-                />
-              </div>
-
-              {/* Share Children Toggle (only for folders) */}
-              {documentType === 'folder' && isPublicState && (
+                {/* Public Sharing Toggle */}
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label className="text-sm font-medium">Share children</Label>
+                    <Label className="text-sm font-medium">Public sharing</Label>
                     <p className="text-xs text-muted-foreground">
-                      Include all documents inside this folder
+                      Anyone with the link can view this {documentType}
                     </p>
                   </div>
                   <Switch
-                    checked={shareChildrenState}
-                    onCheckedChange={handleShareChildrenToggle}
+                    checked={isPublicState}
+                    onCheckedChange={handleToggleSharing}
                     disabled={isLoading}
                   />
                 </div>
-              )}
 
-              {/* Share Link */}
-              {isPublicState && shareUrl && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Share link</Label>
-                  <div className="flex gap-2 w-full">
-                    <Input
-                      value={shareUrl}
-                      readOnly
-                      className="text-xs flex-1 min-w-0 break-all"
-                      onClick={(e) => {
-                        e.currentTarget.select();
-                        copyShareLink();
-                      }}
+                {/* Share Children Toggle (only for folders) */}
+                {documentType === 'folder' && isPublicState && (
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium">Share children</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Include all documents inside this folder
+                      </p>
+                    </div>
+                    <Switch
+                      checked={shareChildrenState}
+                      onCheckedChange={handleShareChildrenToggle}
+                      disabled={isLoading}
                     />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={copyShareLink}
-                      className={`px-3 flex-shrink-0 ${copied ? 'bg-green-100 text-green-700 border-green-300' : ''}`}
-                      title={copied ? "Copied!" : "Copy link"}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={openShareLink}
-                      className="px-3 flex-shrink-0"
-                      title="Open in new tab"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Status */}
-              <div className="flex items-start space-x-2 text-sm text-muted-foreground">
-                <Eye className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span className="break-words">
-                  {isPublicState 
-                    ? `This ${documentType} is publicly shared`
-                    : `This ${documentType} is private`
-                  }
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+                {/* Share Link */}
+                {isPublicState && shareUrl && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Share link</Label>
+                    <div className="flex gap-2 w-full">
+                      <Input
+                        value={shareUrl}
+                        readOnly
+                        className="text-xs flex-1 min-w-0 break-all"
+                        onClick={(e) => {
+                          e.currentTarget.select();
+                          copyShareLink();
+                        }}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={copyShareLink}
+                        className={`px-3 flex-shrink-0 ${copied ? 'bg-green-100 text-green-700 border-green-300' : ''}`}
+                        title={copied ? "Copied!" : "Copy link"}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={openShareLink}
+                        className="px-3 flex-shrink-0"
+                        title="Open in new tab"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status */}
+                <div className="flex items-start space-x-2 text-sm text-muted-foreground">
+                  <Eye className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span className="break-words">
+                    {isPublicState 
+                      ? `This ${documentType} is publicly shared`
+                      : `This ${documentType} is private`
+                    }
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </>
       )}
