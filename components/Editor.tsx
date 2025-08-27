@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X, MoreHorizontal, AlertTriangle, Wrench, FileIcon, Keyboard, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash, Heading3, Heading2, Heading1, Heading1Icon } from "lucide-react";
+import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X, MoreHorizontal, AlertTriangle, Wrench, FileIcon, Keyboard, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash, Heading3, Heading2, Heading1, Heading1Icon, Share2 } from "lucide-react";
 import ImageBlock from "@/components/blocks/ImageBlock";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
@@ -26,7 +26,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
   const idFromParams = params.id as string;
   const finalDocumentId = documentId || idFromParams;
   const { user } = useAuth();
-  const { document, loading, error, saving, saveDocument } = useDocument(finalDocumentId);
+  const { document, loading, error, saving, saveDocument, refetch } = useDocument(finalDocumentId);
   
   // Debug logging
   console.log('Editor render:', { finalDocumentId, user: user?.id, document: !!document, loading, error });
@@ -1255,11 +1255,18 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
               />
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Lock className="h-3 w-3" />
-              <span>Private</span>
-              <Button variant="ghost" size="sm" className="h-4 w-4 p-0">
-                <ChevronDown className="h-3 w-3" />
-              </Button>
+              {document?.is_public ? (
+                <>
+                  <Share2 className="h-3 w-3" />
+                  <span>Public</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="h-3 w-3" />
+                  <span>Private</span>
+                </>
+              )}
+              
             </div>
           </div>
           
@@ -1274,7 +1281,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
               </div>
             </div>
             
-            <Button 
+            {/* <Button 
               variant="ghost" 
               size="sm" 
               className="h-8"
@@ -1297,7 +1304,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                 // Update local state if needed
                 console.log('Sharing changed:', { isPublic, shareChildren });
               }}
-            />
+            /> */}
             
             <Button 
               variant="ghost" 
