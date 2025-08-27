@@ -11,8 +11,9 @@ import ImageBlock from "@/components/blocks/ImageBlock";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
 import { Block, BlockType, CommandItem } from "@/types/editor";
+import ShareButton from "./ShareButton";
 
-export default function Editor() {
+export default function Editor({ documentId }: { documentId?: string } = {}) {
   // Z-index hierarchy:
   // z-0: Block type indicators and drag handles (lowest priority)
   // z-10: Block content area (medium priority)  
@@ -22,9 +23,13 @@ export default function Editor() {
   // z-50: Command palette (highest priority for global UI)
   
   const params = useParams();
-  const documentId = params.id as string;
+  const idFromParams = params.id as string;
+  const finalDocumentId = documentId || idFromParams;
   const { user } = useAuth();
-  const { document, loading, error, saving, saveDocument } = useDocument(documentId);
+  const { document, loading, error, saving, saveDocument } = useDocument(finalDocumentId);
+  
+  // Debug logging
+  console.log('Editor render:', { finalDocumentId, user: user?.id, document: !!document, loading, error });
   
   const [title, setTitle] = useState("");
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -1073,7 +1078,7 @@ export default function Editor() {
         return (
           <ImageBlock
             block={block}
-            documentId={documentId}
+            documentId={finalDocumentId}
             onContentChange={(blockId, content, metadata) => {
               handleBlockChange(blockId, content);
               // Update metadata separately if provided
@@ -1199,7 +1204,7 @@ export default function Editor() {
                       try {
                         const { repairUserDocumentAccess } = await import('@/actions/actions');
                         if (user?.id) {
-                          const result = await repairUserDocumentAccess(user.id, documentId);
+                          const result = await repairUserDocumentAccess(user.id, finalDocumentId);
                           toast.success(`Access repair result: ${result.message}`);
                           // Refresh the document
                           window.location.reload();
@@ -1281,6 +1286,18 @@ export default function Editor() {
             >
               <Keyboard className="h-4 w-4" />
             </Button>
+            
+            <ShareButton
+              documentId={finalDocumentId}
+              isPublic={document?.is_public}
+              shareChildren={document?.share_children}
+              previewToken={document?.preview_token}
+              documentType={document?.type || 'document'}
+              onSharingChange={(isPublic, shareChildren) => {
+                // Update local state if needed
+                console.log('Sharing changed:', { isPublic, shareChildren });
+              }}
+            />
             
             <Button 
               variant="ghost" 

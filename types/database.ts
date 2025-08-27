@@ -13,6 +13,9 @@ export interface Database {
           order_index: number
           created_at: string
           updated_at: string
+          preview_token?: string
+          is_public?: boolean
+          share_children?: boolean
         }
         Insert: {
           id?: string
@@ -25,6 +28,9 @@ export interface Database {
           order_index?: number
           created_at?: string
           updated_at?: string
+          preview_token?: string
+          is_public?: boolean
+          share_children?: boolean
         }
         Update: {
           id?: string
@@ -37,6 +43,9 @@ export interface Database {
           order_index?: number
           created_at?: string
           updated_at?: string
+          preview_token?: string
+          is_public?: boolean
+          share_children?: boolean
         }
       }
       user_rooms: {

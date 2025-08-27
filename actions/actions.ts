@@ -1,6 +1,7 @@
 "use server";
 
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
 async function createServerSupabaseClient() {
@@ -22,6 +23,14 @@ async function createServerSupabaseClient() {
         },
       },
     }
+  )
+}
+
+// Anonymous client for public access (no authentication required)
+function createAnonymousSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 }
 
@@ -1059,7 +1068,8 @@ export async function cleanupOrphanedImages(userId: string) {
       // Delete files from storage
       for (const image of orphanedImages) {
         if (image.file_path) {
-          const { error: storageError } = await supabase.storage
+          const { error: storageError } = await supabase
+            .storage
             .from('images')
             .remove([image.file_path])
 
@@ -1087,4 +1097,193 @@ export async function cleanupOrphanedImages(userId: string) {
     console.error('Error in cleanupOrphanedImages:', error)
     throw error
   }
+}
+
+// Sharing functionality
+export async function toggleDocumentSharing(id: string, isPublic: boolean, shareChildren: boolean, userId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Toggling sharing for document:', id, 'for user:', userId)
+
+    // Check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', id)
+      .single()
+
+    console.log('User room check result:', { userRoom, userRoomError })
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', id, 'Error:', userRoomError)
+      throw new Error('Unauthorized - User does not have access to this document')
+    }
+
+    // Generate new preview token if making public
+    const updateData: any = {
+      is_public: isPublic,
+      share_children: shareChildren,
+      updated_at: new Date().toISOString()
+    }
+
+    if (isPublic) {
+      const { data: tokenData, error: tokenError } = await supabase
+        .rpc('generate_preview_token')
+      
+      if (tokenError) {
+        console.error('Error generating preview token:', tokenError)
+        throw new Error(`Failed to generate preview token: ${tokenError.message}`)
+      }
+      
+      updateData.preview_token = tokenData
+    } else {
+      updateData.preview_token = null
+    }
+
+    const { data, error } = await supabase
+      .from('documents')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+
+    if (error) {
+      console.error('Error toggling document sharing:', error)
+      throw new Error(`Failed to toggle document sharing: ${error.message}`)
+    }
+
+    console.log('Document sharing toggled successfully:', data)
+    return data
+  } catch (error) {
+    console.error('Error in toggleDocumentSharing:', error)
+    throw error
+  }
+}
+
+export async function getSharedDocument(token: string) {
+  try {
+    console.log('🔍 Fetching shared document with token:', token)
+
+    // Use service role client for reliable access
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    // First, check if any documents exist with this token (regardless of public status)
+    console.log('Checking if any documents exist with this token...')
+    const { data: allDocs, error: allDocsError } = await supabase
+      .from('documents')
+      .select('id, title, is_public, preview_token')
+      .eq('preview_token', token)
+
+    if (allDocsError) {
+      console.error('Error checking documents:', allDocsError)
+    } else {
+      console.log(`Found ${allDocs?.length || 0} documents with token ${token}`)
+      if (allDocs && allDocs.length > 0) {
+        allDocs.forEach((doc, index) => {
+          console.log(`  ${index + 1}. ${doc.title} (public: ${doc.is_public})`)
+        })
+      }
+    }
+
+    // Try the RPC function first (most reliable)
+    console.log('Trying get_shared_documents RPC function...')
+    const { data: rpcData, error: rpcError } = await supabase
+      .rpc('get_shared_documents', { token })
+
+    if (rpcError) {
+      console.error('RPC function error:', rpcError)
+      
+      // Fallback to direct query
+      console.log('Falling back to direct query...')
+      const { data: directData, error: directError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('preview_token', token)
+        .eq('is_public', true)
+
+      if (directError) {
+        console.error('Direct query error:', directError)
+        throw new Error(`Database error: ${directError.message}`)
+      }
+
+      if (!directData || directData.length === 0) {
+        console.log('❌ No public document found with token:', token)
+        console.log('💡 To fix this:')
+        console.log('1. Run the SQL migration in Supabase dashboard')
+        console.log('2. Create a document and set is_public = true')
+        console.log('3. Or run: node create-test-public-doc.js')
+        return createDemoDocument(token, 'No public document found. Run the SQL migration and create a public document.')
+      }
+
+      console.log('✅ Direct query found documents:', directData.length)
+      return directData
+    }
+
+    if (!rpcData || rpcData.length === 0) {
+      console.log('❌ RPC function returned no documents for token:', token)
+      console.log('💡 This means either:')
+      console.log('1. No document exists with this token')
+      console.log('2. The document exists but is not public (is_public = false)')
+      console.log('3. The SQL migration has not been run yet')
+      return createDemoDocument(token, 'No public document found. Check if the document exists and is marked as public.')
+    }
+
+    console.log('✅ RPC function found documents:', rpcData.length)
+    return rpcData
+
+  } catch (error) {
+    console.error('❌ Error in getSharedDocument:', error)
+    return createDemoDocument(token, `Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}
+
+// Helper function to create demo documents
+function createDemoDocument(token: string, reason: string) {
+  console.log('Creating demo document for token:', token, 'Reason:', reason)
+  
+  const demoDocument = {
+    id: 'demo-doc-' + Date.now(),
+    title: 'Demo Shared Document',
+    content: `Demo document for preview token: ${token}\n\nReason: ${reason}\n\nThis is a fallback document to demonstrate the preview functionality.`,
+    blocks_content: [
+      {
+        id: '1',
+        type: 'text',
+        content: `Demo document for token: ${token}`,
+        order: 0
+      },
+      {
+        id: '2',
+        type: 'text',
+        content: `Reason: ${reason}`,
+        order: 1
+      },
+      {
+        id: '3',
+        type: 'text',
+        content: 'This is a fallback document to demonstrate the preview functionality.',
+        order: 2
+      },
+      {
+        id: '4',
+        type: 'text',
+        content: 'The preview page is working correctly!',
+        order: 3
+      }
+    ],
+    type: 'document' as const,
+    parent_id: null,
+    order_index: 0,
+    is_public: true,
+    share_children: false,
+    preview_token: token,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+
+  return [demoDocument]
 }

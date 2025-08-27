@@ -2,11 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { ThemeProvider } from "@/components/theme-provider";
-import AppSidebar from "@/components/app-sidebar";
-import AuthForm from "@/components/auth/AuthForm";
-import { AuthGuard } from "@/components/auth/AuthGuard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { Toaster } from "sonner";
+import ConditionalAuthGuard from "@/components/ConditionalAuthGuard";
+import ConditionalLayout from "@/components/ConditionalLayout";
 
 export const metadata: Metadata = {
   title: "Note Forge - Your Notion Alternative",
@@ -24,22 +23,11 @@ export default function RootLayout({
         <ErrorBoundary>
           <ThemeProvider attribute="class" defaultTheme="system">
             <AuthProvider>
-              <AuthGuard>
-                <div className="flex h-screen bg-background">
-                  {/* Sidebar - hidden on mobile, shown on desktop */}
-                  <div className="hidden lg:block flex-shrink-0">
-                    <AppSidebar />
-                  </div>
-                  {/* Main content - full width on mobile, with sidebar on desktop */}
-                  <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-                    {children}
-                  </main>
-                </div>
-                {/* Mobile sidebar overlay */}
-                <div className="lg:hidden">
-                  <AppSidebar />
-                </div>
-              </AuthGuard>
+              <ConditionalAuthGuard>
+                <ConditionalLayout>
+                  {children}
+                </ConditionalLayout>
+              </ConditionalAuthGuard>
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>
