@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useCallback } from 'react';
-import { Image, Upload, Link, X, Loader2, AlertCircle } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Image, Upload, Link, X, Loader2, AlertCircle, MoreHorizontal, Maximize2, Move } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,6 +9,12 @@ import { Block, BlockMetadata } from '@/types/editor';
 import { uploadImage, addExternalImage, deleteImage } from '@/actions/actions';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ImageBlockProps {
   block: Block;
@@ -27,8 +33,63 @@ export default function ImageBlock({
   const [isUploading, setIsUploading] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInput, setUrlInput] = useState('');
-  const [altText, setAltText] = useState(block.metadata?.alt || '');
+  const [caption, setCaption] = useState(block.metadata?.caption || '');
+  const [isHovered, setIsHovered] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [imageWidth, setImageWidth] = useState(block.metadata?.width || 60); // percentage - default to 60% instead of 100%
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [dragStartWidth, setDragStartWidth] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const updateImageWidth = useCallback((width: number) => {
+    setImageWidth(width);
+    onContentChange(block.id, block.content, {
+      ...block.metadata,
+      width: width
+    });
+  }, [block.id, block.content, block.metadata, onContentChange]);
+
+  // Drag functionality
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    setDragStartX(e.clientX);
+    setDragStartWidth(imageWidth);
+  }, [imageWidth]);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging || !containerRef.current) return;
+    
+    const container = containerRef.current.parentElement;
+    if (!container) return;
+    
+    const containerWidth = container.offsetWidth;
+    const deltaX = e.clientX - dragStartX;
+    const deltaPercent = (deltaX / containerWidth) * 100;
+    const newWidth = Math.max(20, Math.min(100, dragStartWidth + deltaPercent));
+    
+    setImageWidth(newWidth);
+  }, [isDragging, dragStartX, dragStartWidth]);
+
+  const handleMouseUp = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+      updateImageWidth(imageWidth);
+    }
+  }, [isDragging, imageWidth, updateImageWidth]);
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (!user?.id) {
@@ -60,7 +121,8 @@ export default function ImageBlock({
           originalFilename: file.name,
           fileSize: file.size,
           mimeType: file.type,
-          alt: altText
+          caption: caption,
+          width: imageWidth || 60
         });
         
         toast.success('Image uploaded successfully!');
@@ -71,7 +133,7 @@ export default function ImageBlock({
     } finally {
       setIsUploading(false);
     }
-  }, [user?.id, documentId, block.id, block.metadata, altText, onContentChange]);
+  }, [user?.id, documentId, block.id, block.metadata, caption, imageWidth, onContentChange]);
 
   const handleExternalUrl = useCallback(async () => {
     if (!user?.id) {
@@ -93,7 +155,7 @@ export default function ImageBlock({
 
     setIsUploading(true);
     try {
-      const result = await addExternalImage(documentId, block.id, urlInput, user.id, altText);
+      const result = await addExternalImage(documentId, block.id, urlInput, user.id, caption);
       
       if (result.success) {
         // Update block content and metadata
@@ -101,7 +163,8 @@ export default function ImageBlock({
           ...block.metadata,
           mode: 'external',
           url: urlInput,
-          alt: altText
+          caption: caption,
+          width: imageWidth || 60
         });
         
         setShowUrlInput(false);
@@ -114,7 +177,7 @@ export default function ImageBlock({
     } finally {
       setIsUploading(false);
     }
-  }, [user?.id, documentId, block.id, block.metadata, urlInput, altText, onContentChange]);
+  }, [user?.id, documentId, block.id, block.metadata, urlInput, caption, imageWidth, onContentChange]);
 
   const handleDelete = useCallback(async () => {
     if (!user?.id) {
@@ -135,7 +198,8 @@ export default function ImageBlock({
           originalFilename: undefined,
           fileSize: undefined,
           mimeType: undefined,
-          alt: undefined
+          caption: undefined,
+          width: undefined
         });
         
         toast.success('Image deleted successfully!');
@@ -160,187 +224,214 @@ export default function ImageBlock({
   const hasImage = block.metadata?.url;
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <Image className="h-5 w-5 text-gray-400" />
-          <span className="text-sm text-gray-400">
-            {block.metadata?.mode === 'upload' ? 'Uploaded Image' : 'External Image'}
-          </span>
-        </div>
-        
-        {hasImage && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDelete}
-            className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-400/10"
-            title="Delete image"
+    <div className="group relative">
+      {hasImage ? (
+        <div 
+          className="relative"
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
+          {/* Image Container */}
+          <div 
+            ref={containerRef}
+            className="relative mx-auto"
+            style={{ 
+              width: `${Math.min(imageWidth, 100)}%`,
+              maxWidth: '100%',
+              minWidth: '200px'
+            }}
           >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-
-      {/* Image Display */}
-      {hasImage && (
-        <div className="mb-4">
-          <div className="relative group">
-                         <img 
-               src={block.metadata?.url || ''} 
-               alt={altText || 'Image'} 
-               className="max-w-full h-auto max-h-96 mx-auto rounded border border-gray-600"
-               onError={(e) => {
-                 e.currentTarget.style.display = 'none';
-                 toast.error('Failed to load image');
-               }}
-             />
+            <img 
+              src={block.metadata?.url || ''} 
+              alt={caption || 'Image'} 
+              className="w-full h-auto max-h-96 rounded-lg shadow-sm object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                toast.error('Failed to load image');
+              }}
+            />
             
-                         {/* Image overlay with info */}
-             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded flex items-center justify-center">
-               <div className="text-white text-center p-4">
-                 <div className="text-sm">
-                   {block.metadata?.mode === 'upload' ? (
-                     <>
-                       <div>📁 {block.metadata?.originalFilename}</div>
-                       <div>📏 {((block.metadata?.fileSize || 0) / 1024 / 1024).toFixed(2)} MB</div>
-                     </>
-                   ) : (
-                     <div className="flex items-center gap-1"><Link className="h-3 w-3" /> External URL</div>
-                   )}
-                 </div>
-               </div>
-             </div>
+            {/* Hover Controls */}
+            {(isHovered || isDragging || isDropdownOpen) && (
+              <>
+                {/* Three dots menu - positioned outside the overlay */}
+                <div className="absolute top-2 right-2 z-50">
+                  <DropdownMenu onOpenChange={setIsDropdownOpen}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 bg-white/95 hover:bg-white shadow-lg border border-gray-200"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="h-4 w-4 text-gray-700" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent 
+                      align="end" 
+                      className="w-48 z-[60]"
+                      side="bottom"
+                      sideOffset={4}
+                    >
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); updateImageWidth(30); }}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>Small</span>
+                          <div className="w-4 h-2 bg-gray-400 rounded"></div>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); updateImageWidth(50); }}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>Medium</span>
+                          <div className="w-6 h-2 bg-gray-400 rounded"></div>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); updateImageWidth(70); }}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>Large</span>
+                          <div className="w-8 h-2 bg-gray-400 rounded"></div>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); updateImageWidth(100); }}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>Full width</span>
+                          <div className="w-10 h-2 bg-gray-400 rounded"></div>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+                        className="text-red-600 focus:text-red-600"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                
+                {/* Resize handles */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {/* Right edge resize handle */}
+                  <div 
+                    className="absolute top-1/2 -right-1 w-3 h-8 bg-blue-500 rounded-full cursor-ew-resize pointer-events-auto opacity-80 hover:opacity-100 transform -translate-y-1/2 flex items-center justify-center"
+                    onMouseDown={handleMouseDown}
+                    title="Drag to resize"
+                  >
+                    <div className="w-0.5 h-4 bg-white rounded"></div>
+                  </div>
+                  
+
+                </div>
+
+                {/* Subtle overlay */}
+                <div className="absolute inset-0 bg-blue-500/5 rounded-lg pointer-events-none"></div>
+              </>
+            )}
           </div>
           
-          {/* Alt text input */}
-          <div className="mt-3">
+          {/* Caption */}
+          <div className="mt-2">
             <Input
-              value={altText}
-              onChange={(e) => setAltText(e.target.value)}
-              placeholder="Alt text for accessibility..."
-              className="text-sm bg-gray-700 border-gray-600 text-white placeholder:text-gray-400"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="Add a caption..."
+              className="text-sm bg-transparent border-none text-gray-600 placeholder:text-gray-400 px-0 focus-visible:ring-0 focus-visible:ring-offset-0"
               onBlur={() => {
-                if (altText !== block.metadata?.alt) {
+                if (caption !== block.metadata?.caption) {
                   onContentChange(block.id, block.content, {
                     ...block.metadata,
-                    alt: altText
+                    caption: caption,
+                    width: imageWidth || 60
                   });
                 }
               }}
             />
           </div>
         </div>
-      )}
-
-      {/* Upload/Add Options */}
-      {!hasImage && (
-        <div className="space-y-4">
-          {/* File Upload */}
-          <Card className="bg-gray-700 border-gray-600">
-            <CardContent className="p-4">
-              <div className="text-center">
-                <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                <h3 className="text-sm font-medium text-white mb-2">Upload Image</h3>
-                <p className="text-xs text-gray-400 mb-3">
-                  Upload an image file from your device
-                </p>
-                
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileInputChange}
-                  className="hidden"
-                />
-                
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  className="w-full"
-                  variant="outline"
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Choose File
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* External URL */}
-          <div className="text-center">
-            <div className="text-gray-400 text-sm mb-2">or</div>
+      ) : (
+        /* Empty State - Upload Options */
+        <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
+          <Image className="h-12 w-12 text-gray-400 mb-4" />
+          <div className="text-center space-y-3">
+            <h3 className="text-lg font-medium text-gray-900">Add an image</h3>
+            <p className="text-sm text-gray-500">Upload, embed with a link, or add from gallery</p>
             
-            {!showUrlInput ? (
+            <div className="flex flex-col sm:flex-row gap-2 mt-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileInputChange}
+                className="hidden"
+              />
+              
               <Button
-                onClick={() => setShowUrlInput(true)}
-                variant="ghost"
-                className="text-blue-400 hover:text-blue-300"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                variant="outline"
+                className="flex items-center gap-2"
               >
-                <Link className="h-4 w-4 mr-2" />
-                Add External URL
+                {isUploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Upload
+                  </>
+                )}
               </Button>
-            ) : (
-              <Card className="bg-gray-700 border-gray-600">
-                <CardContent className="p-4">
-                  <div className="space-y-3">
-                    <Input
-                      value={urlInput}
-                      onChange={(e) => setUrlInput(e.target.value)}
-                      placeholder="https://example.com/image.jpg"
-                      className="text-sm bg-gray-600 border-gray-500 text-white placeholder:text-gray-400"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleExternalUrl();
-                        } else if (e.key === 'Escape') {
-                          setShowUrlInput(false);
-                          setUrlInput('');
-                        }
-                      }}
-                    />
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={handleExternalUrl}
-                        disabled={isUploading || !urlInput.trim()}
-                        size="sm"
-                        className="flex-1"
-                      >
-                        {isUploading ? (
-                          <>
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Adding...
-                          </>
-                        ) : (
-                          'Add Image'
-                        )}
-                      </Button>
-                      
-                      <Button
-                        onClick={() => {
-                          setShowUrlInput(false);
-                          setUrlInput('');
-                        }}
-                        variant="ghost"
-                        size="sm"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+              
+              {!showUrlInput ? (
+                <Button
+                  onClick={() => setShowUrlInput(true)}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <Link className="h-4 w-4" />
+                  Link
+                </Button>
+              ) : (
+                <div className="flex-1 flex gap-2">
+                  <Input
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    placeholder="Paste image link..."
+                    className="flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleExternalUrl();
+                      } else if (e.key === 'Escape') {
+                        setShowUrlInput(false);
+                        setUrlInput('');
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={handleExternalUrl}
+                    disabled={isUploading || !urlInput.trim()}
+                    size="sm"
+                  >
+                    {isUploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Add'
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowUrlInput(false);
+                      setUrlInput('');
+                    }}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
