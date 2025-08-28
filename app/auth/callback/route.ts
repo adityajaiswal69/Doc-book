@@ -25,7 +25,32 @@ export async function GET(request: Request) {
         },
       }
     )
-    await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+    
+    // Handle profile creation for OAuth users
+    if (data?.user && !error) {
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', data.user.id)
+        .single()
+      
+      // If no profile exists, create one
+      if (!existingProfile) {
+        const name = data.user.user_metadata?.name || 
+                    data.user.user_metadata?.full_name || 
+                    data.user.email?.split('@')[0] || ''
+        
+        await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            email: data.user.email,
+            name: name,
+            avatar_url: data.user.user_metadata?.avatar_url || null
+          })
+      }
+    }
   }
 
   // URL to redirect to after sign in process completes

@@ -204,8 +204,8 @@ export default function TableBlock({
       </div>
 
       {/* Table */}
-      <div className="border border-gray-600 rounded-lg overflow-hidden">
-        <table ref={tableRef} className="w-full">
+      <div className="border border-gray-600 rounded-lg overflow-hidden overflow-x-auto">
+        <table ref={tableRef} className="w-full min-w-full">
           <tbody>
             {tableData.map((row, rowIndex) => (
               <tr key={rowIndex} className="border-b border-gray-600 last:border-b-0">
@@ -221,7 +221,7 @@ export default function TableBlock({
                       <div
                         contentEditable
                         suppressContentEditableWarning
-                        className={`p-3 min-h-[40px] outline-none focus:ring-1 focus:ring-blue-500 ${
+                        className={`p-2 sm:p-3 min-h-[44px] sm:min-h-[40px] outline-none focus:ring-1 focus:ring-blue-500 text-sm sm:text-base ${
                           cell.isHeader ? 'text-gray-200 font-medium' : 'text-gray-300'
                         }`}
                         data-cell={`${rowIndex}-${colIndex}`}
@@ -240,9 +240,9 @@ export default function TableBlock({
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-6 w-6 p-0 bg-gray-800/80 hover:bg-gray-700/80"
+                              className="h-8 w-8 sm:h-6 sm:w-6 p-0 bg-gray-800/80 hover:bg-gray-700/80 touch-target"
                             >
-                              <MoreHorizontal className="h-3 w-3" />
+                              <MoreHorizontal className="h-4 w-4 sm:h-3 sm:w-3" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700 text-white">

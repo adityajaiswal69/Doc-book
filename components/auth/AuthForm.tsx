@@ -32,6 +32,7 @@ export default function AuthForm() {
           options: {
             data: {
               name: name,
+              full_name: name,
             },
           },
         });
@@ -60,34 +61,53 @@ export default function AuthForm() {
 
   const handleGoogleSignIn = async () => {
     try {
+      setLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         }
       });
-      if (error) throw error;
+      
+      if (error) {
+        throw error;
+      }
+      
+      // OAuth redirect will happen automatically, so we don't need to do anything else
     } catch (error: any) {
-      toast.error(error.message);
+      // Handle specific error cases
+      if (error.message?.includes('OAuth')) {
+        toast.error('OAuth configuration error. Please check your Google credentials.');
+      } else if (error.message?.includes('redirect')) {
+        toast.error('Redirect configuration error. Please check your app settings.');
+      } else {
+        toast.error(error.message || 'Failed to sign in with Google');
+      }
+      
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
+    <div className="flex items-center justify-center min-h-screen bg-background mobile-safe-area mobile-vh-100">
+      <Card className="w-full max-w-md mx-4 sm:mx-0">
+        <CardHeader className="space-y-1 p-4 sm:p-6">
+          <CardTitle className="text-responsive-xl font-bold text-center">
             {isSignUp ? "Create an account" : "Welcome back"}
           </CardTitle>
-          <CardDescription className="text-center">
+          <CardDescription className="text-center text-responsive-sm">
             {isSignUp 
               ? "Enter your details to create your account" 
               : "Enter your credentials to access your account"
             }
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleAuth} className="space-y-4">
+        <CardContent className="p-4 sm:p-6">
+          <form onSubmit={handleAuth} className="space-y-4 sm:space-y-6">
             {isSignUp && (
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
@@ -99,7 +119,7 @@ export default function AuthForm() {
                     placeholder="John Doe"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 touch-target"
                     required={isSignUp}
                   />
                 </div>
@@ -116,7 +136,7 @@ export default function AuthForm() {
                   placeholder="john@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 touch-target"
                   required
                 />
               </div>
@@ -132,13 +152,13 @@ export default function AuthForm() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10"
+                  className="pl-10 pr-10 touch-target"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground"
+                  className="absolute right-3 top-3 h-6 w-6 sm:h-4 sm:w-4 text-muted-foreground hover:text-foreground touch-target flex items-center justify-center"
                 >
                   {showPassword ? <EyeOff /> : <Eye />}
                 </button>
@@ -151,7 +171,7 @@ export default function AuthForm() {
               </Alert>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full touch-target" disabled={loading}>
               {loading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
             </Button>
 
@@ -169,7 +189,7 @@ export default function AuthForm() {
             <Button
               type="button"
               variant="outline"
-              className="w-full"
+              className="w-full touch-target"
               onClick={handleGoogleSignIn}
               disabled={loading}
             >

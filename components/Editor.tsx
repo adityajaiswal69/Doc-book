@@ -1022,59 +1022,59 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
         return (
           <textarea
             {...commonProps}
-            style={{ ...commonProps.style, fontSize: '32px', fontWeight: 'bold', lineHeight: '1.2' }}
+            style={{ ...commonProps.style, fontSize: 'clamp(24px, 8vw, 32px)', fontWeight: 'bold', lineHeight: '1.2' }}
             placeholder="Heading 1"
-            className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
+            className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2 touch-target"
           />
         );
       case 'heading-2':
         return (
           <textarea
             {...commonProps}
-            style={{ ...commonProps.style, fontSize: '24px', fontWeight: '600', lineHeight: '1.3' }}
+            style={{ ...commonProps.style, fontSize: 'clamp(20px, 6vw, 24px)', fontWeight: '600', lineHeight: '1.3' }}
             placeholder="Heading 2"
-            className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
+            className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2 touch-target"
           />
         );
       case 'heading-3':
         return (
           <textarea
             {...commonProps}
-            style={{ ...commonProps.style, fontSize: '20px', fontWeight: '500', lineHeight: '1.4' }}
+            style={{ ...commonProps.style, fontSize: 'clamp(18px, 5vw, 20px)', fontWeight: '500', lineHeight: '1.4' }}
             placeholder="Heading 3"
-            className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
+            className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2 touch-target"
           />
         );
       case 'bulleted-list':
         return (
           <div className="flex items-start gap-2 group/list-item">
-            <span className="text-blue-400 text-base flex-shrink-0 w-5 text-center group-hover/list-item:text-blue-300 transition-colors min-h-[1.6rem] flex items-center justify-center">•</span>
+            <span className="text-blue-400 text-base flex-shrink-0 w-5 text-center group-hover/list-item:text-blue-300 transition-colors">•</span>
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, flex: 1, lineHeight: '1.6' }}
+              style={{ ...commonProps.style, flex: 1 }}
               placeholder="List item"
-              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-1 py-0"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden m-0 p-0 leading-tight min-h-5 h-auto"
             />
           </div>
         );
       case 'numbered-list':
         return (
           <div className="flex items-start gap-2 group/list-item">
-            <span className="text-blue-400 text-base flex-shrink-0 w-5 text-right group-hover/list-item:text-blue-300 transition-colors font-medium min-h-[1.6rem] flex items-center justify-end">
+            <span className="text-blue-400 text-base flex-shrink-0 w-5 text-right group-hover/list-item:text-blue-300 transition-colors font-medium">
               {block.listIndex || 1}.
             </span>
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, flex: 1, lineHeight: '1.6' }}
+              style={{ ...commonProps.style, flex: 1 }}
               placeholder="List item"
-              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-1 py-0"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden m-0 p-0 leading-tight min-h-5 h-auto"
             />
           </div>
         );
       case 'todo-list':
         return (
           <div className="flex items-start gap-2 group/list-item">
-            <div className="flex-shrink-0 w-5 min-h-[1.6rem] flex items-center justify-center">
+            <div className="flex-shrink-0 w-5 flex items-start justify-center">
               <input 
                 type="checkbox" 
                 checked={block.checked || false}
@@ -1111,20 +1111,19 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                   });
                   setContentChanged(true);
                 }}
-                className="w-4 h-4 text-blue-500 rounded border-gray-600 bg-gray-800 focus:ring-blue-500 focus:ring-2 cursor-pointer" 
+                className="w-4 h-4 text-blue-500 rounded border-gray-600 bg-gray-800 focus:ring-blue-500 focus:ring-2 cursor-pointer mt-0.5" 
               />
             </div>
             <textarea
               {...commonProps}
               style={{ 
                 ...commonProps.style, 
-                flex: 1, 
-                lineHeight: '1.6',
+                flex: 1,
                 textDecoration: block.checked ? 'line-through' : 'none',
                 opacity: block.checked ? 0.6 : 1
               }}
               placeholder="Task item"
-              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-1 py-0"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden m-0 p-0 leading-tight min-h-5 h-auto"
             />
           </div>
         );
@@ -1362,10 +1361,10 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
   }
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col h-full relative mobile-keyboard-safe">
       {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0">
-        <div className="flex items-center justify-between px-4 py-3">
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0 mobile-safe-top">
+        <div className="flex items-center justify-between mobile-safe-area py-3 gap-2">
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-muted-foreground" />
@@ -1373,7 +1372,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                 value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
                 placeholder="Untitled Document"
-                className="text-lg font-semibold border-none shadow-none focus-visible:ring-0 px-0 h-auto min-w-[200px] bg-transparent"
+                className="text-responsive-lg font-semibold border-none shadow-none focus-visible:ring-0 px-0 h-auto min-w-[200px] bg-transparent touch-target"
               />
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -1392,8 +1391,8 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1 sm:gap-3">
+            <div className="hidden sm:flex items-center gap-4 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
                 <span className="flex items-center gap-1"><FileIcon className="h-3 w-3" /> {blocks.length} blocks</span>
                 <span className="flex items-center gap-1"><Type className="h-3 w-3" /> {blocks.reduce((total, block) => total + (block.content?.split(/\s+/).length || 0), 0)} words</span>
@@ -1401,6 +1400,9 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
               <div>
                 {saving ? 'Saving...' : contentChanged ? 'Unsaved changes' : 'All changes saved'}
               </div>
+            </div>
+            <div className="sm:hidden text-xs text-muted-foreground">
+              {saving ? 'Saving...' : contentChanged ? 'Unsaved' : 'Saved'}
             </div>
             
             {/* <Button 
@@ -1453,11 +1455,11 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       </div>
 
       {/* Content editor */}
-      <div className="flex-1 px-6 lg:px-8 overflow-y-auto min-h-0">
-        <div className="max-w-4xl mx-auto py-6 pb-20">
+      <div className="flex-1 mobile-safe-area lg:px-8 overflow-y-auto min-h-0 mobile-scroll">
+        <div className="max-w-4xl mx-auto py-4 sm:py-6 pb-20 mobile-safe-bottom">
           {/* Document title */}
-          <div className="text-center mb-6">
-            <h1 className="text-4xl font-bold mb-3 text-white">
+          <div className="text-center mb-4 sm:mb-6">
+            <h1 className="text-responsive-2xl font-bold mb-2 sm:mb-3 text-white">
               {title || 'Untitled Document'}
             </h1>
           </div>
@@ -1465,12 +1467,12 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
           {/* Blocks */}
           <div className="">
             {blocks.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                <Sparkles className="h-16 w-16 mx-auto text-blue-400 mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Welcome to your document!</h3>
-                <p className="text-sm mb-6">Start typing to create your first block, or use the slash commands below</p>
+              <div className="text-center py-8 sm:py-12 text-gray-400">
+                <Sparkles className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-blue-400 mb-4" />
+                <h3 className="text-responsive-lg font-semibold mb-2">Welcome to your document!</h3>
+                <p className="text-responsive-sm mb-4 sm:mb-6">Start typing to create your first block, or use the slash commands below</p>
                 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
+                <div className="responsive-grid gap-3 sm:gap-4 max-w-2xl mx-auto">
                   {[
                     { icon: '#', title: 'Heading', desc: 'Type # for headings' },
                     { icon: '•', title: 'List', desc: 'Type - for bullet lists' },
@@ -1481,10 +1483,10 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                     { icon: <Film className="h-6 w-6" />, title: 'Video', desc: 'Type /video for videos' },
                     { icon: <BarChart3 className="h-6 w-6" />, title: 'Table', desc: 'Type /table for tables' }
                   ].map((tip, i) => (
-                    <div key={i} className="bg-gray-800/50 p-3 rounded-lg border border-gray-700 flex flex-col items-center justify-center">
-                      <div className="text-2xl mb-2">{tip.icon}</div>
-                      <div className="text-xs font-medium text-white">{tip.title}</div>
-                      <div className="text-xs text-gray-500">{tip.desc}</div>
+                    <div key={i} className="bg-gray-800/50 p-3 sm:p-4 rounded-lg border border-gray-700 flex flex-col items-center justify-center touch-target">
+                      <div className="text-xl sm:text-2xl mb-2">{tip.icon}</div>
+                      <div className="text-xs sm:text-sm font-medium text-white">{tip.title}</div>
+                      <div className="text-xs text-gray-500 text-center">{tip.desc}</div>
                     </div>
                   ))}
                 </div>
@@ -1730,7 +1732,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       {showCommands && (
         <div 
           ref={commandPaletteRef}
-          className="fixed z-50 w-96 bg-gray-800 border border-gray-700 rounded-lg shadow-xl backdrop-blur-sm"
+          className="fixed z-50 w-96 max-w-[90vw] bg-gray-800 border border-gray-700 rounded-lg shadow-xl backdrop-blur-sm"
           style={{
             top: '50%',
             left: '50%',
@@ -1748,7 +1750,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                   value={commandFilter}
                   onChange={(e) => setCommandFilter(e.target.value)}
                   onKeyDown={handleCommandKeyDown}
-                  className="h-8 text-sm bg-gray-700 border-gray-600 text-white placeholder:text-gray-400"
+                  className="h-10 sm:h-8 text-base sm:text-sm bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 touch-target"
                   autoFocus
                 />
               </div>

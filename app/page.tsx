@@ -39,28 +39,28 @@ export default function HomePage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 bg-gradient-to-br from-background to-muted/20">
-      <div className="max-w-4xl w-full space-y-8">
+    <div className="flex-1 flex flex-col items-center justify-center mobile-safe-area bg-gradient-to-br from-background to-muted/20 mobile-vh-100">
+      <div className="max-w-4xl w-full space-y-6 sm:space-y-8">
         {/* Welcome Header */}
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <FileText className="h-6 w-6 text-primary" />
+        <div className="text-center space-y-3 sm:space-y-4">
+          <div className="flex items-center justify-center gap-2 sm:gap-3">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            <h1 className="text-responsive-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
               Doc Book
             </h1>
           </div>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-responsive-lg text-muted-foreground max-w-2xl mx-auto">
             Your personal workspace for notes, ideas, and collaboration. 
             Create, organize, and share your thoughts effortlessly.
           </p>
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="group hover:shadow-lg transition-all duration-200 cursor-pointer" onClick={handleCreateDocument}>
-            <CardContent className="p-6 text-center space-y-3">
+        <div className="responsive-grid gap-3 sm:gap-4">
+          <Card className="group hover:shadow-lg transition-all duration-200 cursor-pointer touch-target" onClick={handleCreateDocument}>
+            <CardContent className="p-4 sm:p-6 text-center space-y-3">
               <div className="h-12 w-12 rounded-lg bg-blue-500/10 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
                 <Plus className="h-6 w-6 text-blue-500" />
               </div>
@@ -69,8 +69,8 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          <Card className="group hover:shadow-lg transition-all duration-200">
-            <CardContent className="p-6 text-center space-y-3">
+          <Card className="group hover:shadow-lg transition-all duration-200 touch-target">
+            <CardContent className="p-4 sm:p-6 text-center space-y-3">
               <div className="h-12 w-12 rounded-lg bg-green-500/10 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
                 <Sparkles className="h-6 w-6 text-green-500" />
               </div>
@@ -79,8 +79,8 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          <Card className="group hover:shadow-lg transition-all duration-200">
-            <CardContent className="p-6 text-center space-y-3">
+          <Card className="group hover:shadow-lg transition-all duration-200 touch-target">
+            <CardContent className="p-4 sm:p-6 text-center space-y-3">
               <div className="h-12 w-12 rounded-lg bg-purple-500/10 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
                 <Zap className="h-6 w-6 text-purple-500" />
               </div>
@@ -91,7 +91,7 @@ export default function HomePage() {
         </div>
 
         {/* Features */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -122,7 +122,7 @@ export default function HomePage() {
           <Button 
             onClick={handleCreateDocument}
             size="lg"
-            className="h-12 px-8 text-lg"
+            className="h-12 px-6 sm:px-8 text-base sm:text-lg touch-target w-full sm:w-auto"
             disabled={isPending}
           >
             {isPending ? (

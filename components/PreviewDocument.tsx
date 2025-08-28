@@ -29,10 +29,10 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
   // Safety check for mainDocument
   if (!mainDocument) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center mobile-safe-area mobile-vh-100">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-2">Document Not Found</h1>
-          <p className="text-gray-600">The main document is not available.</p>
+          <h1 className="text-responsive-xl font-bold text-red-600 mb-2">Document Not Found</h1>
+          <p className="text-responsive-sm text-gray-600">The main document is not available.</p>
         </div>
       </div>
     );
@@ -196,7 +196,7 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
   };
 
   return (
-    <div className="flex h-full bg-black text-white relative">
+    <div className="flex h-full bg-black text-white relative mobile-keyboard-safe mobile-vh-100">
       {/* Mobile Overlay */}
       {isMobileSidebarOpen && (
         <div 
@@ -241,20 +241,22 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
             <Button
               variant="outline"
               size="sm"
-              className="w-full bg-gray-800 border-gray-700 text-white hover:bg-gray-700 text-xs"
+              className="w-full bg-gray-800 border-gray-700 text-white hover:bg-gray-700 text-xs touch-target"
               onClick={copyShareLink}
             >
               <Copy className="h-4 w-4 mr-2" />
-              Copy Link
+              <span className="hidden sm:inline">Copy Link</span>
+              <span className="sm:hidden">Copy</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="w-full bg-gray-800 border-gray-700 text-white hover:bg-gray-700 text-xs"
+              className="w-full bg-gray-800 border-gray-700 text-white hover:bg-gray-700 text-xs touch-target"
               onClick={openInNewTab}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
-              Open in New Tab
+              <span className="hidden sm:inline">Open in New Tab</span>
+              <span className="sm:hidden">Open</span>
             </Button>
           </div>
         </div>
@@ -269,14 +271,14 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
               {/* Mobile menu button */}
               <button
                 onClick={toggleMobileSidebar}
-                className="lg:hidden p-1 hover:bg-gray-800 rounded mr-2 flex-shrink-0"
+                className="lg:hidden p-2 hover:bg-gray-800 rounded mr-2 flex-shrink-0 touch-target"
               >
                 <Menu className="h-5 w-5 text-gray-400" />
               </button>
               
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <FileText className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                <h1 className="text-base lg:text-lg font-semibold text-white truncate">
+                <h1 className="text-responsive-base font-semibold text-white truncate">
                   {selectedDocument?.title || 'Untitled Document'}
                 </h1>
               </div>
@@ -305,11 +307,11 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
         </div>
 
         {/* Document Content - matching Editor.tsx layout */}
-        <div className="flex-1 px-3 sm:px-4 md:px-6 lg:px-8 overflow-y-auto min-h-0 bg-black">
-          <div className="max-w-4xl mx-auto py-4 sm:py-6 pb-16 sm:pb-20">
+        <div className="flex-1 mobile-safe-area lg:px-8 overflow-y-auto min-h-0 bg-black mobile-scroll">
+          <div className="max-w-4xl mx-auto py-4 sm:py-6 pb-16 sm:pb-20 mobile-safe-bottom">
             {/* Document title - matching Editor.tsx style */}
             <div className="text-center mb-4 sm:mb-6">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 text-white leading-tight">
+              <h1 className="text-responsive-2xl font-bold mb-3 text-white leading-tight">
                 {selectedDocument?.title || 'Untitled Document'}
               </h1>
             </div>

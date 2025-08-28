@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import AppSidebar from "./app-sidebar";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 
 export default function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -16,15 +17,18 @@ export default function ConditionalLayout({ children }: { children: React.ReactN
   
   // For all other routes, show the normal layout with sidebar
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar - hidden on mobile, shown on desktop */}
-      <div className="hidden lg:block flex-shrink-0">
-        <AppSidebar />
-      </div>
-      {/* Main content - full width on mobile, with sidebar on desktop */}
-      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {children}
-      </main>
-    </div>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2">
+          <div className="flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          {children}
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

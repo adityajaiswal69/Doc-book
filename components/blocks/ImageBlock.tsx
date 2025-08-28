@@ -26,8 +26,8 @@ interface ImageBlockProps {
 export default function ImageBlock({ 
   block, 
   documentId, 
-  onContentChange, 
-  onBlockDelete 
+      onContentChange, 
+    onBlockDelete 
 }: ImageBlockProps) {
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
@@ -36,7 +36,7 @@ export default function ImageBlock({
   const [caption, setCaption] = useState(block.metadata?.caption || '');
   const [isHovered, setIsHovered] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [imageWidth, setImageWidth] = useState(block.metadata?.width || 60); // percentage - default to 60% instead of 100%
+  const [imageWidth, setImageWidth] = useState(block.metadata?.width || 80); // percentage - default to 80% for better mobile experience
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
   const [dragStartWidth, setDragStartWidth] = useState(0);
@@ -235,16 +235,16 @@ export default function ImageBlock({
           <div 
             ref={containerRef}
             className="relative mx-auto"
-            style={{ 
-              width: `${Math.min(imageWidth, 100)}%`,
-              maxWidth: '100%',
-              minWidth: '200px'
-            }}
+                                  style={{ 
+                        width: `${Math.min(imageWidth, 100)}%`,
+                        maxWidth: '100%',
+                        minWidth: '150px'
+                      }}
           >
             <img 
               src={block.metadata?.url || ''} 
               alt={caption || 'Image'} 
-              className="w-full h-auto max-h-96 rounded-lg shadow-sm object-contain"
+              className="w-full h-auto max-h-64 sm:max-h-96 rounded-lg shadow-sm object-contain"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
                 toast.error('Failed to load image');
@@ -261,10 +261,10 @@ export default function ImageBlock({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 bg-white/95 hover:bg-white shadow-lg border border-gray-200"
+                        className="h-10 w-10 sm:h-8 sm:w-8 p-0 bg-white/95 hover:bg-white shadow-lg border border-gray-200 touch-target"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <MoreHorizontal className="h-4 w-4 text-gray-700" />
+                        <MoreHorizontal className="h-5 w-5 sm:h-4 sm:w-4 text-gray-700" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent 
@@ -349,13 +349,13 @@ export default function ImageBlock({
         </div>
       ) : (
         /* Empty State - Upload Options */
-        <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
-          <Image className="h-12 w-12 text-gray-400 mb-4" />
+        <div className="flex flex-col items-center justify-center py-6 sm:py-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
+          <Image className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mb-3 sm:mb-4" />
           <div className="text-center space-y-3">
-            <h3 className="text-lg font-medium text-gray-900">Add an image</h3>
-            <p className="text-sm text-gray-500">Upload, embed with a link, or add from gallery</p>
+            <h3 className="text-base sm:text-lg font-medium text-gray-900">Add an image</h3>
+            <p className="text-sm text-gray-500 px-4">Upload, embed with a link, or add from gallery</p>
             
-            <div className="flex flex-col sm:flex-row gap-2 mt-4">
+            <div className="flex flex-col sm:flex-row gap-2 mt-4 w-full px-4 sm:px-0">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -368,7 +368,7 @@ export default function ImageBlock({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
                 variant="outline"
-                className="flex items-center gap-2"
+                className="flex items-center justify-center gap-2 touch-target w-full sm:w-auto"
               >
                 {isUploading ? (
                   <>
@@ -387,18 +387,18 @@ export default function ImageBlock({
                 <Button
                   onClick={() => setShowUrlInput(true)}
                   variant="outline"
-                  className="flex items-center gap-2"
+                  className="flex items-center justify-center gap-2 touch-target w-full sm:w-auto"
                 >
                   <Link className="h-4 w-4" />
                   Link
                 </Button>
               ) : (
-                <div className="flex-1 flex gap-2">
+                <div className="flex-1 flex flex-col sm:flex-row gap-2">
                   <Input
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
                     placeholder="Paste image link..."
-                    className="flex-1"
+                    className="flex-1 touch-target"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         handleExternalUrl();
@@ -408,27 +408,31 @@ export default function ImageBlock({
                       }
                     }}
                   />
-                  <Button
-                    onClick={handleExternalUrl}
-                    disabled={isUploading || !urlInput.trim()}
-                    size="sm"
-                  >
-                    {isUploading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      'Add'
-                    )}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setShowUrlInput(false);
-                      setUrlInput('');
-                    }}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleExternalUrl}
+                      disabled={isUploading || !urlInput.trim()}
+                      size="sm"
+                      className="touch-target flex-1 sm:flex-none"
+                    >
+                      {isUploading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Add'
+                      )}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowUrlInput(false);
+                        setUrlInput('');
+                      }}
+                      variant="ghost"
+                      size="sm"
+                      className="touch-target"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
