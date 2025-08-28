@@ -31,13 +31,16 @@ export interface BlockMetadata {
   language?: string; // For code blocks
   url?: string; // For images/videos
   alt?: string; // For images
+  caption?: string; // For images/videos
+  width?: number; // For images/videos (percentage)
   columns?: number; // For tables
   rows?: number; // For tables
-  mode?: 'upload' | 'external'; // For images: uploaded or external URL
-  filePath?: string; // For uploaded images: storage path
-  originalFilename?: string; // For uploaded images: original filename
-  fileSize?: number; // For uploaded images: file size in bytes
-  mimeType?: string; // For uploaded images: MIME type
+  mode?: 'upload' | 'external'; // For images/videos: uploaded or external URL
+  filePath?: string; // For uploaded images/videos: storage path
+  originalFilename?: string; // For uploaded images/videos: original filename
+  fileSize?: number; // For uploaded images/videos: file size in bytes
+  mimeType?: string; // For uploaded images/videos: MIME type
+  isEmbed?: boolean; // For videos: whether it's an embed URL (YouTube, Vimeo, etc.)
   [key: string]: any; // Allow additional metadata
 }
 

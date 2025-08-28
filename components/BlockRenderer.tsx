@@ -1,15 +1,16 @@
 "use client";
 
-import { RichBlock, BlockType } from "@/types/editor";
+import { Block, BlockType } from "@/types/editor";
 import RichTextBlock from "./RichTextBlock";
-import ToggleListBlock from "./blocks/ToggleListBlock";
-import CalloutBlock from "./blocks/CalloutBlock";
 import TableBlock from "./blocks/TableBlock";
+import ImageBlock from "./blocks/ImageBlock";
+import VideoBlock from "./blocks/VideoBlock";
 
 interface BlockRendererProps {
-  block: RichBlock;
+  block: Block;
   isSelected: boolean;
-  onContentChange: (blockId: string, content: string) => void;
+  documentId: string;
+  onContentChange: (blockId: string, content: string, metadata?: any) => void;
   onSelectionChange: (selection: any) => void;
   onKeyDown: (e: React.KeyboardEvent, blockId: string) => void;
   onFocus: (blockId: string) => void;
@@ -22,12 +23,13 @@ interface BlockRendererProps {
   onAddChild: (parentId: string) => void;
   onIconChange: (blockId: string, icon: string) => void;
   onTableStructureChange: (blockId: string, rows: number, columns: number) => void;
-  onDragStart: (e: React.DragEvent, block: RichBlock) => void;
+  onDragStart: (e: React.DragEvent, block: Block) => void;
 }
 
 export default function BlockRenderer({
   block,
   isSelected,
+  documentId,
   onContentChange,
   onSelectionChange,
   onKeyDown,
@@ -56,23 +58,7 @@ export default function BlockRenderer({
 
   // Render different block types
   switch (block.type) {
-    case BlockType.TOGGLE_LIST:
-      return (
-        <ToggleListBlock
-          {...commonProps}
-          onAddChild={onAddChild}
-        />
-      );
-
-    case BlockType.CALLOUT:
-      return (
-        <CalloutBlock
-          {...commonProps}
-          onIconChange={onIconChange}
-        />
-      );
-
-    case BlockType.TABLE:
+    case 'table':
       return (
         <TableBlock
           {...commonProps}
@@ -80,116 +66,38 @@ export default function BlockRenderer({
         />
       );
 
-    case BlockType.DIVIDER:
+    case 'divider':
       return (
         <div className="border-t border-gray-600 my-4" />
       );
 
-    case BlockType.IMAGE:
+    case 'image':
+    case 'im':
       return (
-        <div className="image-block bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
-          <div className="text-4xl mb-2">🖼️</div>
-          <RichTextBlock
-            {...commonProps}
-            placeholder="Image description or URL"
-          />
-        </div>
+        <ImageBlock
+          block={block}
+          documentId={documentId}
+          onContentChange={(blockId, content, metadata) => {
+            onContentChange(blockId, content, metadata);
+          }}
+          onBlockDelete={(blockId) => {
+            onDelete(blockId);
+          }}
+        />
       );
 
-    case BlockType.VIDEO:
+    case 'video':
       return (
-        <div className="video-block bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
-          <div className="text-4xl mb-2">🎥</div>
-          <RichTextBlock
-            {...commonProps}
-            placeholder="Video description or URL"
-          />
-        </div>
-      );
-
-    case BlockType.BOOKMARK:
-      return (
-        <div className="bookmark-block bg-gray-800 border border-gray-700 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <div className="text-2xl">🔖</div>
-            <div className="flex-1">
-              <RichTextBlock
-                {...commonProps}
-                placeholder="Bookmark URL"
-              />
-            </div>
-          </div>
-        </div>
-      );
-
-    case BlockType.COLUMNS:
-      return (
-        <div className="columns-block grid grid-cols-2 gap-4">
-          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-            <RichTextBlock
-              {...commonProps}
-              placeholder="Column 1 content"
-            />
-          </div>
-          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-            <RichTextBlock
-              {...commonProps}
-              placeholder="Column 2 content"
-            />
-          </div>
-        </div>
-      );
-
-    case BlockType.MATH:
-    case BlockType.EQUATION:
-      return (
-        <div className="math-block bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
-          <div className="text-2xl mb-2">∑</div>
-          <RichTextBlock
-            {...commonProps}
-            placeholder="Mathematical equation"
-          />
-        </div>
-      );
-
-    case BlockType.MENTION:
-      return (
-        <div className="mention-block">
-          <RichTextBlock
-            {...commonProps}
-            placeholder="@username"
-          />
-        </div>
-      );
-
-    case BlockType.PAGE_REFERENCE:
-      return (
-        <div className="page-reference-block bg-gray-800 border border-gray-700 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <div className="text-2xl">📄</div>
-            <div className="flex-1">
-              <RichTextBlock
-                {...commonProps}
-                placeholder="Page title or ID"
-              />
-            </div>
-          </div>
-        </div>
-      );
-
-    case BlockType.DATABASE_REFERENCE:
-      return (
-        <div className="database-reference-block bg-gray-800 border border-gray-700 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <div className="text-2xl">🗄️</div>
-            <div className="flex-1">
-              <RichTextBlock
-                {...commonProps}
-                placeholder="Database name or ID"
-              />
-            </div>
-          </div>
-        </div>
+        <VideoBlock
+          block={block}
+          documentId={documentId}
+          onContentChange={(blockId, content, metadata) => {
+            onContentChange(blockId, content, metadata);
+          }}
+          onBlockDelete={(blockId) => {
+            onDelete(blockId);
+          }}
+        />
       );
 
     // Default case - render as rich text block

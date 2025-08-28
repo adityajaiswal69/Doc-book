@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X, MoreHorizontal, AlertTriangle, Wrench, FileIcon, Keyboard, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash, Heading3, Heading2, Heading1, Heading1Icon, Share2, ListOrdered } from "lucide-react";
 import ImageBlock from "@/components/blocks/ImageBlock";
+import VideoBlock from "@/components/blocks/VideoBlock";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
 import { Block, BlockType, CommandItem } from "@/types/editor";
@@ -333,6 +334,15 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
           // Ensure metadata is properly set for image and video blocks
           if (newBlock.type === 'image' && !newBlock.metadata) {
             newBlock.metadata = {
+              mode: 'external',
+              url: newBlock.content,
+              type: 'image'
+            };
+          } else if (newBlock.type === 'image' && newBlock.metadata && !newBlock.metadata.url && newBlock.content) {
+            // Migrate existing image blocks that have content but no metadata.url
+            newBlock.metadata = {
+              ...newBlock.metadata,
+              mode: 'external',
               url: newBlock.content,
               type: 'image'
             };
@@ -400,6 +410,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                 content: trimmedLine,
                 orderIndex: index,
                 metadata: {
+                  mode: 'external',
                   url: trimmedLine,
                   type: 'image'
                 }
@@ -501,6 +512,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
         if (updatedBlock.type === 'image') {
           updatedBlock.metadata = {
             ...updatedBlock.metadata,
+            mode: 'external',
             url: newContent,
             type: 'image'
           };
@@ -584,6 +596,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
           if (command.id === 'image') {
             updatedBlock.metadata = {
               ...updatedBlock.metadata,
+              mode: 'external',
               url: result.newContent,
               type: 'image'
             };
@@ -1154,30 +1167,33 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
         );
       case 'image':
         return (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <Image className="h-5 w-5 text-gray-400" />
-              <span className="text-sm text-gray-400">Image URL:</span>
-            </div>
-            <textarea
-              {...commonProps}
-              style={{ ...commonProps.style, fontFamily: 'monospace', fontSize: '14px', lineHeight: '1.4' }}
-              placeholder="https://example.com/image.jpg"
-              className="w-full resize-none border-none outline-none bg-transparent text-blue-400 focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
-            />
-            {block.content && block.content.startsWith('http') && (
-              <div className="mt-3 p-2 bg-gray-900 rounded border border-gray-600">
-                <img 
-                  src={block.content} 
-                  alt="Preview" 
-                  className="max-w-full h-auto max-h-48 mx-auto rounded"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
-          </div>
+          <ImageBlock
+            block={block}
+            documentId={finalDocumentId}
+            onContentChange={(blockId, content, metadata) => {
+              handleBlockChange(blockId, content);
+              // Update metadata separately if provided
+              if (metadata) {
+                setBlocks(prev => prev.map(b => 
+                  b.id === blockId 
+                    ? { ...b, metadata: { ...b.metadata, ...metadata } }
+                    : b
+                ));
+              }
+            }}
+            onBlockDelete={(blockId) => {
+              if (blocks.length > 1) {
+                setBlocks(prev => {
+                  const filteredBlocks = prev.filter(b => b.id !== blockId);
+                  const updatedBlocks = filteredBlocks.map((block, idx) => ({
+                    ...block,
+                    orderIndex: idx
+                  }));
+                  return updateListIndices(updatedBlocks);
+                });
+              }
+            }}
+          />
         );
       case 'im':
         return (
@@ -1211,32 +1227,33 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
         );
       case 'video':
         return (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <Video className="h-5 w-5 text-gray-400" />
-              <span className="text-sm text-gray-400">Video URL:</span>
-            </div>
-            <textarea
-              {...commonProps}
-              style={{ ...commonProps.style, fontFamily: 'monospace', fontSize: '14px', lineHeight: '1.4' }}
-              placeholder="https://example.com/video.mp4"
-              className="w-full resize-none border-none outline-none bg-transparent text-blue-400 focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
-            />
-            {block.content && block.content.startsWith('http') && (
-              <div className="mt-3 p-2 bg-gray-900 rounded border border-gray-600">
-                <video 
-                  src={block.content} 
-                  controls
-                  className="max-w-full h-auto max-h-48 mx-auto rounded"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                >
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-            )}
-          </div>
+          <VideoBlock
+            block={block}
+            documentId={finalDocumentId}
+            onContentChange={(blockId, content, metadata) => {
+              handleBlockChange(blockId, content);
+              // Update metadata separately if provided
+              if (metadata) {
+                setBlocks(prev => prev.map(b => 
+                  b.id === blockId 
+                    ? { ...b, metadata: { ...b.metadata, ...metadata } }
+                    : b
+                ));
+              }
+            }}
+            onBlockDelete={(blockId) => {
+              if (blocks.length > 1) {
+                setBlocks(prev => {
+                  const filteredBlocks = prev.filter(b => b.id !== blockId);
+                  const updatedBlocks = filteredBlocks.map((block, idx) => ({
+                    ...block,
+                    orderIndex: idx
+                  }));
+                  return updateListIndices(updatedBlocks);
+                });
+              }
+            }}
+          />
         );
       default:
         return (

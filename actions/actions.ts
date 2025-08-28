@@ -1110,6 +1110,348 @@ export async function deleteImage(documentId: string, blockId: string, userId: s
   }
 }
 
+// Video handling functions
+export async function uploadVideo(
+  documentId: string, 
+  blockId: string, 
+  file: File, 
+  userId: string
+) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Uploading video for document:', documentId, 'block:', blockId, 'user:', userId)
+    console.log('File details:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      sizeInMB: (file.size / (1024 * 1024)).toFixed(2)
+    })
+
+    // Check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', documentId)
+      throw new Error("Access denied to this document")
+    }
+
+    // Get document title for storage path
+    const { data: document, error: documentError } = await supabase
+      .from('documents')
+      .select('title')
+      .eq('id', documentId)
+      .single()
+
+    if (documentError || !document) {
+      console.error('Document not found:', documentId)
+      throw new Error("Document not found")
+    }
+
+    // Create storage path
+    const sanitizedTitle = document.title.toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+    const storagePath = `${sanitizedTitle}/${blockId}.video/${file.name}`
+    
+    console.log('Storage path:', storagePath)
+    console.log('Document title:', document.title, '-> sanitized:', sanitizedTitle)
+
+    // Check if there's an existing video for this block that needs cleanup
+    const { data: existingVideo } = await supabase
+      .from('storage_images')
+      .select('*')
+      .eq('document_id', documentId)
+      .eq('block_id', blockId)
+      .single()
+
+    // If replacing an uploaded video, delete the old file from storage
+    if (existingVideo && existingVideo.mode === 'upload' && existingVideo.file_path) {
+      console.log('Cleaning up existing video:', existingVideo.file_path)
+      
+      // Try to find and delete the actual file in the folder
+      try {
+        // List files in the directory
+        const folderPath = existingVideo.file_path.endsWith('/') ? existingVideo.file_path : existingVideo.file_path + '/'
+        const { data: files, error: listError } = await supabase.storage
+          .from('images')
+          .list(folderPath.replace(/\/$/, ''), { limit: 100 })
+        
+        if (!listError && files && files.length > 0) {
+          // Delete all files in the block folder
+          const filesToDelete = files.map(file => folderPath + file.name)
+          console.log('Deleting files:', filesToDelete)
+          
+          const { error: cleanupError } = await supabase.storage
+            .from('images')
+            .remove(filesToDelete)
+          
+          if (cleanupError) {
+            console.warn('Warning: Could not delete old video files:', cleanupError.message)
+          } else {
+            console.log('Successfully deleted old video files:', filesToDelete.length)
+          }
+        } else {
+          console.warn('No files found in folder:', folderPath)
+        }
+      } catch (error) {
+        console.warn('Warning: Error during cleanup:', error instanceof Error ? error.message : String(error))
+        // Continue with upload anyway
+      }
+    }
+
+    // Check if bucket exists first
+    const { data: buckets, error: bucketError } = await supabase.storage.listBuckets()
+    
+    if (bucketError) {
+      console.error('Error checking buckets:', bucketError)
+      throw new Error('Failed to access storage')
+    }
+
+    const imagesBucket = buckets.find(bucket => bucket.name === 'images')
+    if (!imagesBucket) {
+      throw new Error('Storage bucket "images" not found. Please run: node setup-storage.js to create the bucket and set up storage policies.')
+    }
+
+    // Upload file to Supabase Storage (using images bucket for videos too)
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('images')
+      .upload(storagePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+
+    if (uploadError) {
+      console.error('Error uploading file:', uploadError)
+      console.error('Upload error details:', {
+        message: uploadError.message,
+        stack: uploadError.stack
+      })
+      
+      // Provide more specific error messages
+      if (uploadError.message.includes('not found')) {
+        throw new Error('Storage bucket "images" not found. Please run: node setup-storage.js to create the bucket.')
+      } else if (uploadError.message.includes('permission')) {
+        throw new Error('Permission denied. Please check your storage bucket policies or run: node setup-storage.js')
+      } else if (uploadError.message.includes('file size') || uploadError.message.includes('exceeded') || uploadError.message.includes('maximum')) {
+        throw new Error(`File size exceeds the allowed limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB. The current bucket limit is 500MB. Please reduce the file size.`)
+      } else if (uploadError.message.includes('file type') || uploadError.message.includes('mime')) {
+        throw new Error(`File type not allowed. File type: ${file.type}. Please use MP4, MOV, AVI, MKV, WebM, M4V, FLV, WMV, or OGV.`)
+      } else {
+        throw new Error(`Failed to upload file: ${uploadError.message}`)
+      }
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('images')
+      .getPublicUrl(storagePath)
+
+    // Store video metadata in database (reusing storage_images table)
+    const { data: videoData, error: videoError } = await supabase
+      .rpc('handle_image_block', {
+        p_document_id: documentId,
+        p_block_id: blockId,
+        p_mode: 'upload',
+        p_url: urlData.publicUrl,
+        p_original_filename: file.name,
+        p_file_size: file.size,
+        p_mime_type: file.type
+      })
+    
+    // Update the file_path separately if needed
+    if (!videoError && videoData) {
+      await supabase
+        .from('storage_images')
+        .update({ file_path: storagePath })
+        .eq('document_id', documentId)
+        .eq('block_id', blockId)
+    }
+
+    if (videoError) {
+      console.error('Error storing video metadata:', videoError)
+      // Clean up uploaded file if metadata storage fails
+      await supabase.storage.from('images').remove([storagePath])
+      throw new Error(`Failed to store video metadata: ${videoError.message}`)
+    }
+
+    console.log('Video uploaded successfully:', videoData)
+    
+    return { 
+      success: true, 
+      videoData,
+      url: urlData.publicUrl,
+      filePath: storagePath
+    }
+  } catch (error) {
+    console.error('Error in uploadVideo:', error)
+    throw error
+  }
+}
+
+export async function addExternalVideo(
+  documentId: string, 
+  blockId: string, 
+  url: string, 
+  userId: string,
+  caption?: string
+) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Adding external video for document:', documentId, 'block:', blockId, 'user:', userId)
+
+    // Check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', documentId)
+      throw new Error("Access denied to this document")
+    }
+
+    // Store video metadata in database (reusing storage_images table and function)
+    const { data: videoData, error: videoError } = await supabase
+      .rpc('handle_image_block', {
+        p_document_id: documentId,
+        p_block_id: blockId,
+        p_mode: 'external',
+        p_url: url,
+        p_alt_text: caption
+      })
+
+    if (videoError) {
+      console.error('Error storing external video metadata:', videoError)
+      throw new Error(`Failed to store video metadata: ${videoError.message}`)
+    }
+
+    console.log('External video added successfully:', videoData)
+    return { 
+      success: true, 
+      videoData,
+      url: url
+    }
+  } catch (error) {
+    console.error('Error in addExternalVideo:', error)
+    throw error
+  }
+}
+
+export async function deleteVideo(documentId: string, blockId: string, userId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    console.log('Deleting video for document:', documentId, 'block:', blockId, 'user:', userId)
+
+    // Check if user has access to this document
+    const { data: userRoom, error: userRoomError } = await supabase
+      .from('user_rooms')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('room_id', documentId)
+      .single()
+
+    if (userRoomError || !userRoom) {
+      console.error('User does not have access to document:', documentId)
+      throw new Error("Access denied to this document")
+    }
+
+    // Get video data to check if it's an uploaded file (reusing storage_images table)
+    const { data: videoData, error: videoError } = await supabase
+      .from('storage_images')
+      .select('*')
+      .eq('document_id', documentId)
+      .eq('block_id', blockId)
+      .single()
+
+    if (videoError) {
+      console.error('Error fetching video data:', videoError)
+      throw new Error(`Failed to fetch video data: ${videoError.message}`)
+    }
+
+    if (!videoData) {
+      console.log('No video found for deletion')
+      return { success: true, message: 'No video found' }
+    }
+
+    // If it's an uploaded video, delete the file from storage
+    if (videoData.mode === 'upload' && videoData.file_path) {
+      console.log('Deleting video file from storage:', videoData.file_path)
+      
+      try {
+        // Since file_path might be just the folder, we need to list and delete all files in it
+        const folderPath = videoData.file_path.endsWith('/') ? videoData.file_path : videoData.file_path + '/'
+        
+        // List files in the directory
+        const { data: files, error: listError } = await supabase.storage
+          .from('images')
+          .list(folderPath.replace(/\/$/, ''), { limit: 100 })
+        
+        if (!listError && files && files.length > 0) {
+          // Delete all files in the block folder
+          const filesToDelete = files.map(file => folderPath + file.name)
+          console.log('Deleting files:', filesToDelete)
+          
+          const { error: storageError } = await supabase.storage
+            .from('images')
+            .remove(filesToDelete)
+          
+          if (storageError) {
+            console.error('Error deleting files from storage:', storageError.message)
+            console.warn('Database record will still be deleted despite storage cleanup failure')
+          } else {
+            console.log('Successfully deleted', filesToDelete.length, 'video files from storage')
+          }
+        } else if (listError) {
+          console.error('Error listing files in folder:', listError.message)
+        } else {
+          console.log('No files found in folder:', folderPath)
+        }
+        
+        // Also try to delete the folder itself if it's empty
+        try {
+          await supabase.storage.from('images').remove([folderPath.replace(/\/$/, '')])
+        } catch (folderError) {
+          // Ignore folder deletion errors as it might not be empty or might not exist
+        }
+        
+      } catch (error) {
+        console.error('Error during storage cleanup:', error instanceof Error ? error.message : String(error))
+        console.warn('Database record will still be deleted despite storage cleanup failure')
+      }
+    } else {
+      console.log('Video is external URL or has no file path, skipping storage cleanup')
+    }
+
+    // Delete from database (reusing image delete function)
+    const { data: deleteData, error: deleteError } = await supabase
+      .rpc('delete_image_block', {
+        p_document_id: documentId,
+        p_block_id: blockId
+      })
+
+    if (deleteError) {
+      console.error('Error deleting video from database:', deleteError)
+      throw new Error(`Failed to delete video: ${deleteError.message}`)
+    }
+
+    console.log('Video deleted successfully')
+    return { success: true, message: 'Video deleted successfully' }
+  } catch (error) {
+    console.error('Error in deleteVideo:', error)
+    throw error
+  }
+}
+
 export async function getDocumentImages(documentId: string, userId: string) {
   try {
     const supabase = await createServerSupabaseClient()
