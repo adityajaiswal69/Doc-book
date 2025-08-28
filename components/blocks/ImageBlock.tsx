@@ -41,8 +41,8 @@ export default function ImageBlock({
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) { // 10MB limit
-      toast.error('Image file size must be less than 10MB');
+    if (file.size > 50 * 1024 * 1024) { // 50MB limit to match bucket
+      toast.error('Image file size must be less than 50MB');
       return;
     }
 

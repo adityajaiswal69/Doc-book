@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X, MoreHorizontal, AlertTriangle, Wrench, FileIcon, Keyboard, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash, Heading3, Heading2, Heading1, Heading1Icon, Share2 } from "lucide-react";
+import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X, MoreHorizontal, AlertTriangle, Wrench, FileIcon, Keyboard, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash, Heading3, Heading2, Heading1, Heading1Icon, Share2, ListOrdered } from "lucide-react";
 import ImageBlock from "@/components/blocks/ImageBlock";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
@@ -64,34 +64,34 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
   const resizeTimeoutsRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
   // Function to get icon for block type
-  const getBlockTypeIcon = (type: BlockType) => {
+  const getBlockTypeIcon = (type: BlockType, size: string = "h-4 w-4") => {
     switch (type) {
       case 'text':
-        return <Type className="h-5 w-5" />;
+        return <Type className={size} />;
       case 'heading-1':
-        return <Heading1 className="h-5 w-5" />;
+        return <Heading1 className={size} />;
       case 'heading-2':
-        return <Heading2 className="h-5 w-5" />;
+        return <Heading2 className={size} />;
       case 'heading-3':
-        return <Heading3 className="h-5 w-5" />
+        return <Heading3 className={size} />
       case 'bulleted-list':
-        return <List className="h-5 w-5" />;
+        return <List className={size} />;
       case 'numbered-list':
-        return <List className="h-5 w-5" />;
+        return <ListOrdered className={size} />;
       case 'todo-list':
-        return <CheckSquare className="h-5 w-5" />;
+        return <CheckSquare className={size} />;
       case 'quote':
-        return <Quote className="h-5 w-5" />;
+        return <Quote className={size} />;
       case 'code-block':
-        return <Code className="h-5 w-5" />;
+        return <Code className={size} />;
       case 'im':
-        return <Image className="h-5 w-5" />;
+        return <Image className={size} />;
       case 'video':
-        return <Video className="h-5 w-5" />;
+        return <Video className={size} />;
       case 'table':
-        return <Table className="h-5 w-5" />;
+        return <Table className={size} />;
       default:
-        return <Type className="h-5 w-5" />;
+        return <Type className={size} />;
     }
   };
 
@@ -186,7 +186,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       shortcut: "[ ]",
       preview: (
         <div className="flex items-start">
-          <input type="checkbox" className="mr-3 mt-1" />
+          <input type="checkbox" className="mr-3 mt-1 w-4 h-4 text-blue-500 rounded border-gray-600 bg-gray-800" />
           <span className="text-gray-200">Task item</span>
         </div>
       ),
@@ -658,22 +658,53 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
     }
   }, [filteredCommands, selectedCommandIndex, handleCommandSelect]);
 
-  // Update list indices for numbered lists
+  // Update list indices for numbered lists with proper sequence management
   const updateListIndices = useCallback((blocks: Block[]) => {
     let currentListIndex = 1;
-    return blocks.map(block => {
+    let inNumberedSequence = false;
+    
+    return blocks.map((block, index) => {
       if (block.type === 'numbered-list') {
+        if (!inNumberedSequence) {
+          // Starting a new numbered list sequence
+          currentListIndex = 1;
+          inNumberedSequence = true;
+        }
+        
         const updatedBlock = { ...block, listIndex: currentListIndex };
         currentListIndex++;
         return updatedBlock;
+      } else {
+        // Reset sequence when we encounter a non-numbered-list block
+        inNumberedSequence = false;
+        return block;
       }
-      return block;
     });
   }, []);
 
   // Add new block
-  const addBlock = useCallback((afterBlockId: string) => {
-    const newBlock: Block = { id: `block-${Date.now()}`, type: 'text' as BlockType, content: '' };
+  const addBlock = useCallback((afterBlockId: string, shouldContinueList: boolean = true) => {
+    const afterBlock = blocks.find(b => b.id === afterBlockId);
+    
+    // Determine the type of the new block based on the previous block
+    let newBlockType: BlockType = 'text';
+    if (shouldContinueList && afterBlock) {
+      if (afterBlock.type === 'numbered-list' && afterBlock.content.trim() !== '') {
+        newBlockType = 'numbered-list';
+      } else if (afterBlock.type === 'bulleted-list' && afterBlock.content.trim() !== '') {
+        newBlockType = 'bulleted-list';
+      } else if (afterBlock.type === 'todo-list' && afterBlock.content.trim() !== '') {
+        newBlockType = 'todo-list';
+      }
+    }
+    
+    const newBlock: Block = { 
+      id: `block-${Date.now()}`, 
+      type: newBlockType, 
+      content: '',
+      listIndex: newBlockType === 'numbered-list' ? (afterBlock?.listIndex || 0) + 1 : undefined
+    };
+    
     setBlocks(prev => {
       const index = prev.findIndex(b => b.id === afterBlockId);
       const newBlocks = [...prev];
@@ -710,7 +741,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
         blockElement.focus();
       }
     }, 10);
-  }, [updateListIndices, saveDocument]);
+  }, [blocks, updateListIndices, saveDocument]);
 
   // Drag and drop handlers
   const handleDragStart = useCallback((e: React.DragEvent, blockId: string) => {
@@ -868,37 +899,69 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       const currentBlock = blocks.find(b => b.id === blockId);
       if (!currentBlock) return;
       
-      // Always add a new block on Enter
-      addBlock(blockId);
+      // Special handling for list items
+      if (currentBlock.type === 'numbered-list' || currentBlock.type === 'bulleted-list' || currentBlock.type === 'todo-list') {
+        if (currentBlock.content.trim() === '') {
+          // Empty list item - convert to text block
+          setBlocks(prev => prev.map(block => 
+            block.id === blockId 
+              ? { ...block, type: 'text' as BlockType, listIndex: undefined }
+              : block
+          ));
+          setContentChanged(true);
+          return;
+        }
+      }
+      
+      // Add a new block, continuing the list if appropriate
+      addBlock(blockId, true);
     } else if (e.key === 'Backspace') {
       const block = blocks.find(b => b.id === blockId);
-      if (block && block.content === '' && blocks.length > 1) {
-        e.preventDefault();
-        setBlocks(prev => {
-          const filteredBlocks = prev.filter(b => b.id !== blockId);
+      if (block && block.content === '') {
+        if (blocks.length > 1) {
+          e.preventDefault();
           
-          // Update order indices for remaining blocks
-          const updatedBlocks = filteredBlocks.map((block, idx) => ({
-            ...block,
-            orderIndex: idx
-          }));
+          // If it's a list item and it's empty, and there's a previous block, focus it
+          const currentIndex = blocks.findIndex(b => b.id === blockId);
+          const prevBlock = currentIndex > 0 ? blocks[currentIndex - 1] : null;
           
-          const finalBlocks = updateListIndices(updatedBlocks);
+          setBlocks(prev => {
+            const filteredBlocks = prev.filter(b => b.id !== blockId);
+            
+            // Update order indices for remaining blocks
+            const updatedBlocks = filteredBlocks.map((block, idx) => ({
+              ...block,
+              orderIndex: idx
+            }));
+            
+            const finalBlocks = updateListIndices(updatedBlocks);
+            
+            // Save the updated blocks to the backend
+            (async () => {
+              try {
+                setContentChanged(true);
+                await saveDocument({ blocks_content: finalBlocks });
+                setContentChanged(false);
+              } catch (error) {
+                console.error('Failed to save after block deletion:', error);
+                setContentChanged(true);
+              }
+            })();
+            
+            return finalBlocks;
+          });
           
-          // Save the updated blocks to the backend
-          (async () => {
-            try {
-              setContentChanged(true);
-              await saveDocument({ blocks_content: finalBlocks });
-              setContentChanged(false);
-            } catch (error) {
-              console.error('Failed to save after block deletion:', error);
-              setContentChanged(true);
-            }
-          })();
-          
-          return finalBlocks;
-        });
+          // Focus the previous block
+          if (prevBlock) {
+            setTimeout(() => {
+              const blockElement = blockRefs.current[prevBlock.id];
+              if (blockElement) {
+                blockElement.focus();
+                blockElement.setSelectionRange(blockElement.value.length, blockElement.value.length);
+              }
+            }, 10);
+          }
+        }
       }
     }
   }, [blocks, addBlock, updateListIndices, saveDocument]);
@@ -971,42 +1034,84 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
         );
       case 'bulleted-list':
         return (
-          <div className="flex items-start gap-3 group/list-item">
-            <span className="text-blue-400 text-lg mt-2 flex-shrink-0 w-4 text-center group-hover/list-item:text-blue-300 transition-colors">•</span>
+          <div className="flex items-start gap-2 group/list-item">
+            <span className="text-blue-400 text-base flex-shrink-0 w-5 text-center group-hover/list-item:text-blue-300 transition-colors min-h-[1.6rem] flex items-center justify-center">•</span>
             <textarea
               {...commonProps}
               style={{ ...commonProps.style, flex: 1, lineHeight: '1.6' }}
               placeholder="List item"
-              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-1 py-0"
             />
           </div>
         );
       case 'numbered-list':
         return (
-          <div className="flex items-start gap-3 group/list-item">
-            <span className="text-blue-400 text-lg mt-2 flex-shrink-0 w-6 text-right group-hover/list-item:text-blue-300 transition-colors font-mono">
+          <div className="flex items-start gap-2 group/list-item">
+            <span className="text-blue-400 text-base flex-shrink-0 w-5 text-right group-hover/list-item:text-blue-300 transition-colors font-medium min-h-[1.6rem] flex items-center justify-end">
               {block.listIndex || 1}.
             </span>
             <textarea
               {...commonProps}
               style={{ ...commonProps.style, flex: 1, lineHeight: '1.6' }}
               placeholder="List item"
-              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-1 py-0"
             />
           </div>
         );
       case 'todo-list':
         return (
-          <div className="flex items-start gap-3 group/list-item">
-            <input 
-              type="checkbox" 
-              className="mt-2 flex-shrink-0 w-4 h-4 text-blue-500 rounded border-gray-600 bg-gray-800 focus:ring-blue-500 focus:ring-2 cursor-pointer" 
-            />
+          <div className="flex items-start gap-2 group/list-item">
+            <div className="flex-shrink-0 w-5 min-h-[1.6rem] flex items-center justify-center">
+              <input 
+                type="checkbox" 
+                checked={block.checked || false}
+                onChange={(e) => {
+                  const newChecked = e.target.checked;
+                  setBlocks(prev => {
+                    const updatedBlocks = prev.map(b => 
+                      b.id === block.id 
+                        ? { ...b, checked: newChecked }
+                        : b
+                    );
+                    
+                    // Auto-save the checked state
+                    if (contentSaveTimeoutRef.current) {
+                      clearTimeout(contentSaveTimeoutRef.current);
+                    }
+                    
+                    contentSaveTimeoutRef.current = setTimeout(async () => {
+                      if (isSavingContentRef.current) return;
+                      
+                      try {
+                        isSavingContentRef.current = true;
+                        await saveDocument({ blocks_content: updatedBlocks });
+                        setContentChanged(false);
+                      } catch (error) {
+                        console.error('Failed to save todo state:', error);
+                        setContentChanged(true);
+                      } finally {
+                        isSavingContentRef.current = false;
+                      }
+                    }, 1000);
+                    
+                    return updatedBlocks;
+                  });
+                  setContentChanged(true);
+                }}
+                className="w-4 h-4 text-blue-500 rounded border-gray-600 bg-gray-800 focus:ring-blue-500 focus:ring-2 cursor-pointer" 
+              />
+            </div>
             <textarea
               {...commonProps}
-              style={{ ...commonProps.style, flex: 1, lineHeight: '1.6' }}
+              style={{ 
+                ...commonProps.style, 
+                flex: 1, 
+                lineHeight: '1.6',
+                textDecoration: block.checked ? 'line-through' : 'none',
+                opacity: block.checked ? 0.6 : 1
+              }}
               placeholder="Task item"
-              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-3 py-2"
+              className="w-full resize-none border-none outline-none bg-transparent text-white focus:outline-none focus:ring-0 transition-all duration-100 whitespace-pre-wrap break-words overflow-hidden rounded px-1 py-0"
             />
           </div>
         );
@@ -1341,7 +1446,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
           </div>
           
           {/* Blocks */}
-          <div className="space-y-3">
+          <div className="">
             {blocks.length === 0 ? (
               <div className="text-center py-12 text-gray-400">
                 <Sparkles className="h-16 w-16 mx-auto text-blue-400 mb-4" />
@@ -1372,7 +1477,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                 {blocks.map((block, index) => (
                   <div 
                     key={block.id} 
-                    className={`relative group py-2 px-4 rounded-lg transition-all duration-200 hover:bg-gray-800/30 ${
+                    className={`relative group py-1 px-3 rounded-lg transition-all duration-200 hover:bg-gray-800/30 ${
                       draggedBlockId === block.id ? 'opacity-50' : ''
                     } ${
                       dragOverBlockId === block.id ? 'bg-blue-500/10 border-l-4 border-blue-500' : ''
@@ -1383,27 +1488,27 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                     onDrop={(e) => handleDrop(e, block.id)}
                     onDragEnd={() => setDragOverBlockId(null)}
                   >
-                    {/* Drag handle with block type name - visible on hover */}
+                    {/* Drag handle with block type icon - visible on hover */}
                     <div 
-                      className="absolute left-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing z-0"
+                      className="absolute left-1 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-grab active:cursor-grabbing z-0"
                       draggable={true}
                       onDragStart={(e) => handleDragStart(e, block.id)}
-                      title="Drag to reorder"
+                      title={`Drag to reorder ${block.type.replace('-', ' ')} block`}
                     >
-                      <div className="text-xs text-gray-500 font-mono bg-gray-800/50 px-2 py-1 rounded hover:bg-gray-700/50 hover:text-gray-300 transition-colors">
-                        {block.type.replace('-', ' ')}
+                      <div className="text-gray-500 bg-gray-800/50 p-1.5 rounded hover:bg-gray-700/50 hover:text-gray-300 transition-colors">
+                        {getBlockTypeIcon(block.type)}
                       </div>
                     </div>
                     
                     {/* Block content with proper padding */}
-                    <div className="ml-20 mr-12 relative z-10">
+                    <div className="ml-12 mr-10 relative z-10">
                       {renderBlock(block)}
                       
 
                     </div>
                     
                     {/* Three dots menu - visible on hover */}
-                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20" data-block-menu>
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20" data-block-menu>
                       <button
                         onClick={() => setOpenMenuBlockId(openMenuBlockId === block.id ? null : block.id)}
                         className="p-2 rounded-md hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
@@ -1438,7 +1543,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                                   }`}
                                   title={type.replace('-', ' ')}
                                 >
-                                  {getBlockTypeIcon(type as BlockType)}
+                                  {getBlockTypeIcon(type as BlockType, "h-5 w-5")}
                                 </button>
                               ))}
                             </div>
@@ -1577,7 +1682,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
               variant="ghost"
               onClick={() => {
                 if (blocks.length > 0) {
-                  addBlock(blocks[blocks.length - 1]?.id || '');
+                  addBlock(blocks[blocks.length - 1]?.id || '', false);
                 } else {
                   // If no blocks exist, create the first block
                   const newBlock: Block = { id: `block-${Date.now()}`, type: 'text' as BlockType, content: '', orderIndex: 0 };

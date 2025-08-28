@@ -765,6 +765,12 @@ export async function uploadImage(
     const supabase = await createServerSupabaseClient()
     
     console.log('Uploading image for document:', documentId, 'block:', blockId, 'user:', userId)
+    console.log('File details:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      sizeInMB: (file.size / (1024 * 1024)).toFixed(2)
+    })
 
     // Check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -796,6 +802,52 @@ export async function uploadImage(
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
     const storagePath = `${sanitizedTitle}/${blockId}.image/${file.name}`
+    
+    console.log('Storage path:', storagePath)
+    console.log('Document title:', document.title, '-> sanitized:', sanitizedTitle)
+
+    // Check if there's an existing image for this block that needs cleanup
+    const { data: existingImage } = await supabase
+      .from('storage_images')
+      .select('*')
+      .eq('document_id', documentId)
+      .eq('block_id', blockId)
+      .single()
+
+    // If replacing an uploaded image, delete the old file from storage
+    if (existingImage && existingImage.mode === 'upload' && existingImage.file_path) {
+      console.log('Cleaning up existing image:', existingImage.file_path)
+      
+      // Try to find and delete the actual file in the folder
+      try {
+        // List files in the directory
+        const folderPath = existingImage.file_path.endsWith('/') ? existingImage.file_path : existingImage.file_path + '/'
+        const { data: files, error: listError } = await supabase.storage
+          .from('images')
+          .list(folderPath.replace(/\/$/, ''), { limit: 100 })
+        
+        if (!listError && files && files.length > 0) {
+          // Delete all files in the block folder
+          const filesToDelete = files.map(file => folderPath + file.name)
+          console.log('Deleting files:', filesToDelete)
+          
+          const { error: cleanupError } = await supabase.storage
+            .from('images')
+            .remove(filesToDelete)
+          
+          if (cleanupError) {
+            console.warn('Warning: Could not delete old image files:', cleanupError.message)
+          } else {
+            console.log('Successfully deleted old image files:', filesToDelete.length)
+          }
+        } else {
+          console.warn('No files found in folder:', folderPath)
+        }
+      } catch (error) {
+        console.warn('Warning: Error during cleanup:', error instanceof Error ? error.message : String(error))
+        // Continue with upload anyway
+      }
+    }
 
     // Check if bucket exists first
     const { data: buckets, error: bucketError } = await supabase.storage.listBuckets()
@@ -807,7 +859,7 @@ export async function uploadImage(
 
     const imagesBucket = buckets.find(bucket => bucket.name === 'images')
     if (!imagesBucket) {
-      throw new Error('Storage bucket "images" not found. Please create the bucket first using the setup script or manual setup guide.')
+      throw new Error('Storage bucket "images" not found. Please run: node setup-storage.js to create the bucket and set up storage policies.')
     }
 
     // Upload file to Supabase Storage
@@ -820,16 +872,20 @@ export async function uploadImage(
 
     if (uploadError) {
       console.error('Error uploading file:', uploadError)
+      console.error('Upload error details:', {
+        message: uploadError.message,
+        stack: uploadError.stack
+      })
       
       // Provide more specific error messages
       if (uploadError.message.includes('not found')) {
-        throw new Error('Storage bucket "images" not found. Please run the setup script or follow the manual setup guide.')
+        throw new Error('Storage bucket "images" not found. Please run: node setup-storage.js to create the bucket.')
       } else if (uploadError.message.includes('permission')) {
-        throw new Error('Permission denied. Please check your storage bucket policies.')
-      } else if (uploadError.message.includes('file size')) {
-        throw new Error('File size exceeds the allowed limit (50MB).')
-      } else if (uploadError.message.includes('file type')) {
-        throw new Error('File type not allowed. Please use JPG, PNG, GIF, WebP, SVG, or BMP.')
+        throw new Error('Permission denied. Please check your storage bucket policies or run: node setup-storage.js')
+      } else if (uploadError.message.includes('file size') || uploadError.message.includes('exceeded') || uploadError.message.includes('maximum')) {
+        throw new Error(`File size exceeds the allowed limit. File size: ${(file.size / (1024 * 1024)).toFixed(2)}MB. The current bucket limit is 50MB. Please reduce the file size.`)
+      } else if (uploadError.message.includes('file type') || uploadError.message.includes('mime')) {
+        throw new Error(`File type not allowed. File type: ${file.type}. Please use JPG, PNG, GIF, WebP, SVG, BMP, TIFF, or ICO.`)
       } else {
         throw new Error(`Failed to upload file: ${uploadError.message}`)
       }
@@ -841,6 +897,7 @@ export async function uploadImage(
       .getPublicUrl(storagePath)
 
     // Store image metadata in database
+    // Note: Using existing function signature for now
     const { data: imageData, error: imageError } = await supabase
       .rpc('handle_image_block', {
         p_document_id: documentId,
@@ -851,6 +908,15 @@ export async function uploadImage(
         p_file_size: file.size,
         p_mime_type: file.type
       })
+    
+    // Update the file_path separately if needed
+    if (!imageError && imageData) {
+      await supabase
+        .from('storage_images')
+        .update({ file_path: storagePath })
+        .eq('document_id', documentId)
+        .eq('block_id', blockId)
+    }
 
     if (imageError) {
       console.error('Error storing image metadata:', imageError)
@@ -860,6 +926,12 @@ export async function uploadImage(
     }
 
     console.log('Image uploaded successfully:', imageData)
+    
+    // Optional: Run cleanup of deleted images in background (don't await to avoid blocking)
+    cleanupMarkedForDeletion().catch(error => 
+      console.warn('Background cleanup failed:', error.message)
+    )
+    
     return { 
       success: true, 
       imageData,
@@ -971,14 +1043,51 @@ export async function deleteImage(documentId: string, blockId: string, userId: s
 
     // If it's an uploaded image, delete the file from storage
     if (imageData.mode === 'upload' && imageData.file_path) {
-      const { error: storageError } = await supabase.storage
-        .from('images')
-        .remove([imageData.file_path])
-
-      if (storageError) {
-        console.error('Error deleting file from storage:', storageError)
-        // Continue with database deletion even if storage deletion fails
+      console.log('Deleting image file from storage:', imageData.file_path)
+      
+      try {
+        // Since file_path might be just the folder, we need to list and delete all files in it
+        const folderPath = imageData.file_path.endsWith('/') ? imageData.file_path : imageData.file_path + '/'
+        
+        // List files in the directory
+        const { data: files, error: listError } = await supabase.storage
+          .from('images')
+          .list(folderPath.replace(/\/$/, ''), { limit: 100 })
+        
+        if (!listError && files && files.length > 0) {
+          // Delete all files in the block folder
+          const filesToDelete = files.map(file => folderPath + file.name)
+          console.log('Deleting files:', filesToDelete)
+          
+          const { error: storageError } = await supabase.storage
+            .from('images')
+            .remove(filesToDelete)
+          
+          if (storageError) {
+            console.error('Error deleting files from storage:', storageError.message)
+            console.warn('Database record will still be deleted despite storage cleanup failure')
+          } else {
+            console.log('Successfully deleted', filesToDelete.length, 'image files from storage')
+          }
+        } else if (listError) {
+          console.error('Error listing files in folder:', listError.message)
+        } else {
+          console.log('No files found in folder:', folderPath)
+        }
+        
+        // Also try to delete the folder itself if it's empty
+        try {
+          await supabase.storage.from('images').remove([folderPath.replace(/\/$/, '')])
+        } catch (folderError) {
+          // Ignore folder deletion errors as it might not be empty or might not exist
+        }
+        
+      } catch (error) {
+        console.error('Error during storage cleanup:', error instanceof Error ? error.message : String(error))
+        console.warn('Database record will still be deleted despite storage cleanup failure')
       }
+    } else {
+      console.log('Image is external URL or has no file path, skipping storage cleanup')
     }
 
     // Delete from database
@@ -1033,6 +1142,50 @@ export async function getDocumentImages(documentId: string, userId: string) {
   } catch (error) {
     console.error('Error in getDocumentImages:', error)
     throw error
+  }
+}
+
+// Background cleanup function for images marked for deletion
+async function cleanupMarkedForDeletion() {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    // Get images marked for deletion (older than 5 minutes to avoid race conditions)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+    
+    const { data: deletedImages, error: queryError } = await supabase
+      .from('storage_images')
+      .select('file_path')
+      .eq('mode', 'upload')
+      .not('deleted_at', 'is', null)
+      .not('file_path', 'is', null)
+      .lt('deleted_at', fiveMinutesAgo)
+      .limit(10) // Limit to avoid overloading
+
+    if (queryError || !deletedImages || deletedImages.length === 0) {
+      return // Silent fail for background cleanup
+    }
+
+    // Delete files from storage
+    const pathsToDelete = deletedImages.map(img => img.file_path)
+    const { error: storageError } = await supabase.storage
+      .from('images')
+      .remove(pathsToDelete)
+
+    if (!storageError) {
+      // Remove database records for successfully deleted files
+      await supabase
+        .from('storage_images')
+        .delete()
+        .not('deleted_at', 'is', null)
+        .lt('deleted_at', fiveMinutesAgo)
+        .in('file_path', pathsToDelete)
+      
+      console.log(`Background cleanup: removed ${pathsToDelete.length} deleted images`)
+    }
+  } catch (error) {
+    // Silent fail for background cleanup
+    console.warn('Background cleanup error:', error instanceof Error ? error.message : String(error))
   }
 }
 

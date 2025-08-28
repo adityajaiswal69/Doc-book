@@ -69,7 +69,8 @@ CREATE OR REPLACE FUNCTION handle_image_block(
   p_original_filename text DEFAULT NULL,
   p_file_size bigint DEFAULT NULL,
   p_mime_type text DEFAULT NULL,
-  p_alt_text text DEFAULT NULL
+  p_alt_text text DEFAULT NULL,
+  p_file_path text DEFAULT NULL
 )
 RETURNS jsonb AS $$
 DECLARE
@@ -102,7 +103,12 @@ BEGIN
   
   -- Create file path for uploaded images
   IF p_mode = 'upload' THEN
-    v_file_path := create_document_storage_path(v_document_title, p_block_id);
+    -- Use provided file path if available, otherwise generate from document title
+    IF p_file_path IS NOT NULL THEN
+      v_file_path := p_file_path;
+    ELSE
+      v_file_path := create_document_storage_path(v_document_title, p_block_id);
+    END IF;
   ELSE
     v_file_path := NULL;
   END IF;

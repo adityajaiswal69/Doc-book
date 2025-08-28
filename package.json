@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "setup:storage": "node setup-storage.js",
+    "cleanup:images": "node cleanup-images.js",
     "migrate:hierarchical": "node run-hierarchical-migration.js",
     "test:hierarchical": "node test-hierarchical.js",
     "test:dragdrop": "node test-drag-drop.js"

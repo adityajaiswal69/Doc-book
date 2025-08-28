@@ -23,13 +23,35 @@ LIVEBLOCKS_SECRET_KEY=your_liveblocks_secret_key
 3. Copy and paste the contents of `supabase-migration.sql`
 4. Run the migration to create the necessary tables and policies
 
-## 3. Start the Development Server
+## 3. Storage Setup
+
+**Important**: Set up the storage bucket for image uploads:
+
+```bash
+node setup-storage.js
+```
+
+This script will:
+- Create the "images" storage bucket
+- Configure storage policies for authentication
+- Set file size limits (50MB default)
+- Test the storage configuration
+
+Alternative manual setup:
+1. Go to your Supabase project dashboard
+2. Navigate to Storage
+3. Create a new bucket named "images"
+4. Set it as public
+5. Configure file size limit (50MB recommended)
+6. Allow MIME types: image/jpeg, image/png, image/gif, image/webp, image/svg+xml, image/bmp
+
+## 4. Start the Development Server
 
 ```bash
 npm run dev
 ```
 
-## 4. Test the Application
+## 5. Test the Application
 
 1. Open http://localhost:3000 in your browser
 2. You should see the authentication form
