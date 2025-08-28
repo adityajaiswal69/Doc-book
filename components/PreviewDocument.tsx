@@ -13,7 +13,9 @@ import {
   ChevronDown,
   Eye,
   Copy,
-  ExternalLink
+  ExternalLink,
+  Menu,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import PreviewBlockRenderer from "./PreviewBlockRenderer";
@@ -39,6 +41,7 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>(mainDocument.id);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   // Parse blocks from the main document
   useEffect(() => {
@@ -88,6 +91,15 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
     window.open(shareUrl, '_blank');
   };
 
+  const toggleMobileSidebar = () => {
+    setIsMobileSidebarOpen(!isMobileSidebarOpen);
+  };
+
+  const selectDocument = (docId: string) => {
+    setSelectedDocumentId(docId);
+    setIsMobileSidebarOpen(false); // Close mobile sidebar when selecting a document
+  };
+
   // Group child documents by parent (for folder structure)
   const documentsByParent = childDocuments.reduce((acc, doc) => {
     const parentId = doc.parent_id || 'root';
@@ -114,7 +126,7 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
               className={`flex items-center space-x-2 px-2 py-1 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 ${
                 isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
               }`}
-              onClick={() => setSelectedDocumentId(doc.id)}
+              onClick={() => selectDocument(doc.id)}
             >
               {isFolder ? (
                 <button
@@ -162,35 +174,56 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
 
       return (
         <div key={doc.id} className="w-full">
-          <div
-            className={`flex items-center space-x-2 px-2 py-1 rounded cursor-pointer hover:bg-gray-800 ${
-              isSelected ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''
-            }`}
-            onClick={() => setSelectedDocumentId(doc.id)}
-          >
-            <div className="w-6" />
-            
-            {isFolder ? (
-              <Folder className="h-4 w-4 text-blue-400" />
-            ) : (
-              <FileText className="h-4 w-4 text-gray-400" />
-            )}
-            
-            <span className="flex-1 text-sm truncate text-white">{doc.title}</span>
-          </div>
+                      <div
+              className={`flex items-center space-x-2 px-2 py-2 sm:py-1 rounded cursor-pointer hover:bg-gray-800 active:bg-gray-700 transition-colors ${
+                isSelected ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''
+              }`}
+              onClick={() => selectDocument(doc.id)}
+            >
+              <div className="w-6" />
+              
+              {isFolder ? (
+                <Folder className="h-4 w-4 text-blue-400 flex-shrink-0" />
+              ) : (
+                <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+              )}
+              
+              <span className="flex-1 text-sm truncate text-white">{doc.title}</span>
+            </div>
         </div>
       );
     });
   };
 
   return (
-    <div className="flex h-full bg-black text-white">
+    <div className="flex h-full bg-black text-white relative">
+      {/* Mobile Overlay */}
+      {isMobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={toggleMobileSidebar}
+        />
+      )}
+      
       {/* Sidebar */}
-      <div className="w-64 border-r border-gray-800 bg-gray-900/50 flex flex-col">
+      <div className={`
+        w-64 border-r border-gray-800 bg-gray-900 flex flex-col
+        fixed lg:relative inset-y-0 left-0 z-50 
+        transform ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+        lg:translate-x-0 transition-transform duration-200 ease-in-out
+      `}>
         <div className="p-4 border-b border-gray-800">
-          <div className="flex items-center space-x-2 mb-2">
-            <Eye className="h-4 w-4 text-blue-500" />
-            <h2 className="font-semibold text-sm text-white">Shared Documents</h2>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-2">
+              <Eye className="h-4 w-4 text-blue-500" />
+              <h2 className="font-semibold text-sm text-white">Shared Documents</h2>
+            </div>
+            <button
+              onClick={toggleMobileSidebar}
+              className="lg:hidden p-1 hover:bg-gray-800 rounded"
+            >
+              <X className="h-4 w-4 text-gray-400" />
+            </button>
           </div>
           <p className="text-xs text-gray-400">
             {mainDocument.share_children ? 'Folder shared' : 'Document shared'}
@@ -208,7 +241,7 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
             <Button
               variant="outline"
               size="sm"
-              className="w-full bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+              className="w-full bg-gray-800 border-gray-700 text-white hover:bg-gray-700 text-xs"
               onClick={copyShareLink}
             >
               <Copy className="h-4 w-4 mr-2" />
@@ -217,7 +250,7 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
             <Button
               variant="outline"
               size="sm"
-              className="w-full bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+              className="w-full bg-gray-800 border-gray-700 text-white hover:bg-gray-700 text-xs"
               onClick={openInNewTab}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
@@ -228,27 +261,35 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-black">
+      <div className="flex-1 flex flex-col overflow-hidden bg-black lg:ml-0">
         {/* Header - matching Editor.tsx style */}
         <div className="border-b border-gray-800 bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-black/60 flex-shrink-0">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-gray-400" />
-                <h1 className="text-lg font-semibold text-white">
+          <div className="flex items-center justify-between px-3 lg:px-4 py-3">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              {/* Mobile menu button */}
+              <button
+                onClick={toggleMobileSidebar}
+                className="lg:hidden p-1 hover:bg-gray-800 rounded mr-2 flex-shrink-0"
+              >
+                <Menu className="h-5 w-5 text-gray-400" />
+              </button>
+              
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <FileText className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                <h1 className="text-base lg:text-lg font-semibold text-white truncate">
                   {selectedDocument?.title || 'Untitled Document'}
                 </h1>
               </div>
-              <div className="flex items-center gap-1 text-xs text-gray-400">
+              <div className="hidden sm:flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
                 <Eye className="h-3 w-3" />
                 <span>Preview Mode</span>
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-4 text-xs text-gray-400">
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="hidden md:flex items-center gap-4 text-xs text-gray-400">
                 <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-1">
+                  <span className="hidden lg:flex items-center gap-1">
                     <FileText className="h-3 w-3" /> 
                     {selectedBlocks.length} blocks
                   </span>
@@ -257,18 +298,18 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
                     {selectedBlocks.reduce((total, block) => total + (block.content?.split(/\s+/).length || 0), 0)} words
                   </span>
                 </div>
-                <div>Read-only preview</div>
+                <div className="hidden lg:block">Read-only preview</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Document Content - matching Editor.tsx layout */}
-        <div className="flex-1 px-6 lg:px-8 overflow-y-auto min-h-0 bg-black">
-          <div className="max-w-4xl mx-auto py-6 pb-20">
+        <div className="flex-1 px-3 sm:px-4 md:px-6 lg:px-8 overflow-y-auto min-h-0 bg-black">
+          <div className="max-w-4xl mx-auto py-4 sm:py-6 pb-16 sm:pb-20">
             {/* Document title - matching Editor.tsx style */}
-            <div className="text-center mb-6">
-              <h1 className="text-4xl font-bold mb-3 text-white">
+            <div className="text-center mb-4 sm:mb-6">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 text-white leading-tight">
                 {selectedDocument?.title || 'Untitled Document'}
               </h1>
             </div>
@@ -279,7 +320,7 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
                 {selectedBlocks
                   .sort((a, b) => (a.order || a.orderIndex || 0) - (b.order || b.orderIndex || 0))
                   .map((block) => (
-                    <div key={block.id} className="py-1 px-2 rounded-lg">
+                    <div key={block.id} className="py-1 px-1 sm:px-2 rounded-lg">
                       <PreviewBlockRenderer
                         block={block}
                         isPreview={true}
@@ -288,9 +329,9 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
                   ))}
               </div>
             ) : (
-              <div className="text-center py-12 text-gray-400">
-                <FileText className="h-16 w-16 text-blue-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold mb-2 text-white">No content available</h3>
+              <div className="text-center py-8 sm:py-12 text-gray-400 px-4">
+                <FileText className="h-12 w-12 sm:h-16 sm:w-16 text-blue-400 mx-auto mb-4" />
+                <h3 className="text-lg sm:text-xl font-semibold mb-2 text-white">No content available</h3>
                 <p className="text-sm text-gray-400">
                   This document doesn't have any content to display.
                 </p>
