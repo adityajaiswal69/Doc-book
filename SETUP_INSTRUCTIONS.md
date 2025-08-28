@@ -1,4 +1,4 @@
-# Setup Instructions for Note Forge
+# Setup Instructions for Doc Book
 
 ## 1. Environment Variables
 

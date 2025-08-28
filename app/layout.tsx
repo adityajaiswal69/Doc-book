@@ -8,7 +8,7 @@ import ConditionalAuthGuard from "@/components/ConditionalAuthGuard";
 import ConditionalLayout from "@/components/ConditionalLayout";
 
 export const metadata: Metadata = {
-  title: "Note Forge - Your Notion Alternative",
+  title: "Doc Book - Your Notion Alternative",
   description: "A powerful note-taking app built with Next.js and Supabase",
 };
 

@@ -48,7 +48,7 @@ export default function HomePage() {
               <FileText className="h-6 w-6 text-primary" />
             </div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              Note Forge
+              Doc Book
             </h1>
           </div>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">

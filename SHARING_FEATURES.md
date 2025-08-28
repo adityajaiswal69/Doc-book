@@ -1,6 +1,6 @@
 # Document Sharing Features
 
-This document outlines the new public preview and sharing functionality implemented in Note Forge.
+This document outlines the new public preview and sharing functionality implemented in Doc Book.
 
 ## Overview
 

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Document Preview - Note Forge",
-  description: "Preview shared documents from Note Forge",
+  title: "Document Preview - Doc Book",
+  description: "Preview shared documents from Doc Book",
 };
 
 export default function PreviewLayout({

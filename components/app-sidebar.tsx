@@ -342,20 +342,20 @@ export default function AppSidebar() {
         </div>
 
         {/* Quick Actions */}
-        <div className="space-y-1">
+        {/* <div className="space-y-1">
           <Button variant="ghost" size="sm" className="w-full justify-start h-8">
             <Lightbulb className="h-4 w-4 mr-2" />
-            Welcome to Note Forge!
+            Welcome to Doc Book!
           </Button>
           <Button variant="ghost" size="sm" className="w-full justify-start h-8">
             <CheckSquare className="h-4 w-4 mr-2" />
             Habit Tracker
           </Button>
-        </div>
+        </div> */}
       </div>
 
       {/* Shared Section */}
-      <div className="p-3 border-t">
+      {/* <div className="p-3 border-t">
         <div className="space-y-1">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2 mb-2">
             Shared
@@ -365,10 +365,10 @@ export default function AppSidebar() {
             Start collaborating
           </Button>
         </div>
-      </div>
+      </div> */}
 
       {/* Settings & Tools */}
-      <div className="p-3 border-t">
+      {/* <div className="p-3 border-t">
         <div className="space-y-1">
           <Button variant="ghost" size="sm" className="w-full justify-start h-8">
             <Settings className="h-4 w-4 mr-2" />
@@ -383,10 +383,10 @@ export default function AppSidebar() {
             Trash
           </Button>
         </div>
-      </div>
+      </div> */}
 
       {/* Bottom Actions */}
-      <div className="p-3 border-t">
+      {/* <div className="p-3 border-t">
         <div className="space-y-2">
           <Button variant="ghost" size="sm" className="w-full justify-start h-8">
             <Users className="h-4 w-4 mr-2" />
@@ -404,7 +404,7 @@ export default function AppSidebar() {
             </Button>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* User Profile Footer */}
       <div className="p-3 border-t">
