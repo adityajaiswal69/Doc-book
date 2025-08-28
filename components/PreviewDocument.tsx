@@ -46,12 +46,12 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
       setBlocks(mainDocument.blocks_content);
     } else if (mainDocument.content) {
       // Fallback to content if blocks_content is not available
-      setBlocks([{
-        id: '1',
-        type: 'text',
-        content: mainDocument.content,
-        order: 0
-      }]);
+              setBlocks([{
+          id: '1',
+          type: 'text',
+          content: mainDocument.content,
+          orderIndex: 0
+        }]);
     }
   }, [mainDocument]);
 
@@ -163,20 +163,20 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
       return (
         <div key={doc.id} className="w-full">
           <div
-            className={`flex items-center space-x-2 px-2 py-1 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 ${
-              isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+            className={`flex items-center space-x-2 px-2 py-1 rounded cursor-pointer hover:bg-gray-800 ${
+              isSelected ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''
             }`}
             onClick={() => setSelectedDocumentId(doc.id)}
           >
             <div className="w-6" />
             
             {isFolder ? (
-              <Folder className="h-4 w-4 text-blue-500" />
+              <Folder className="h-4 w-4 text-blue-400" />
             ) : (
-              <FileText className="h-4 w-4 text-gray-500" />
+              <FileText className="h-4 w-4 text-gray-400" />
             )}
             
-            <span className="flex-1 text-sm truncate">{doc.title}</span>
+            <span className="flex-1 text-sm truncate text-white">{doc.title}</span>
           </div>
         </div>
       );
@@ -184,15 +184,15 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
   };
 
   return (
-    <div className="flex h-full bg-background">
+    <div className="flex h-full bg-black text-white">
       {/* Sidebar */}
-      <div className="w-64 border-r border-border bg-muted/30 flex flex-col">
-        <div className="p-4 border-b border-border">
+      <div className="w-64 border-r border-gray-800 bg-gray-900/50 flex flex-col">
+        <div className="p-4 border-b border-gray-800">
           <div className="flex items-center space-x-2 mb-2">
             <Eye className="h-4 w-4 text-blue-500" />
-            <h2 className="font-semibold text-sm">Shared Documents</h2>
+            <h2 className="font-semibold text-sm text-white">Shared Documents</h2>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-gray-400">
             {mainDocument.share_children ? 'Folder shared' : 'Document shared'}
           </p>
         </div>
@@ -203,12 +203,12 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
           </div>
         </div>
         
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-gray-800">
           <div className="space-y-2">
             <Button
               variant="outline"
               size="sm"
-              className="w-full"
+              className="w-full bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
               onClick={copyShareLink}
             >
               <Copy className="h-4 w-4 mr-2" />
@@ -217,7 +217,7 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
             <Button
               variant="outline"
               size="sm"
-              className="w-full"
+              className="w-full bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
               onClick={openInNewTab}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
@@ -228,45 +228,70 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="border-b border-border p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">{selectedDocument?.title || 'Untitled'}</h1>
-              <p className="text-sm text-muted-foreground">
-                Shared document • Read-only
-              </p>
+      <div className="flex-1 flex flex-col overflow-hidden bg-black">
+        {/* Header - matching Editor.tsx style */}
+        <div className="border-b border-gray-800 bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-black/60 flex-shrink-0">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-gray-400" />
+                <h1 className="text-lg font-semibold text-white">
+                  {selectedDocument?.title || 'Untitled Document'}
+                </h1>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-gray-400">
+                <Eye className="h-3 w-3" />
+                <span>Preview Mode</span>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <Eye className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Preview Mode</span>
+            
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4 text-xs text-gray-400">
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-1">
+                    <FileText className="h-3 w-3" /> 
+                    {selectedBlocks.length} blocks
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <FileText className="h-3 w-3" /> 
+                    {selectedBlocks.reduce((total, block) => total + (block.content?.split(/\s+/).length || 0), 0)} words
+                  </span>
+                </div>
+                <div>Read-only preview</div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Document Content */}
-        <div className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-4xl mx-auto">
+        {/* Document Content - matching Editor.tsx layout */}
+        <div className="flex-1 px-6 lg:px-8 overflow-y-auto min-h-0 bg-black">
+          <div className="max-w-4xl mx-auto py-6 pb-20">
+            {/* Document title - matching Editor.tsx style */}
+            <div className="text-center mb-6">
+              <h1 className="text-4xl font-bold mb-3 text-white">
+                {selectedDocument?.title || 'Untitled Document'}
+              </h1>
+            </div>
+            
+            {/* Blocks */}
             {selectedBlocks.length > 0 ? (
-              <div className="space-y-4">
+              <div className="">
                 {selectedBlocks
-                  .sort((a, b) => a.order - b.order)
+                  .sort((a, b) => (a.order || a.orderIndex || 0) - (b.order || b.orderIndex || 0))
                   .map((block) => (
-                    <PreviewBlockRenderer
-                      key={block.id}
-                      block={block}
-                      isPreview={true}
-                    />
+                    <div key={block.id} className="py-1 px-2 rounded-lg">
+                      <PreviewBlockRenderer
+                        block={block}
+                        isPreview={true}
+                      />
+                    </div>
                   ))}
               </div>
             ) : (
-              <div className="text-center py-12">
-                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-muted-foreground mb-2">
-                  No content available
-                </h3>
-                <p className="text-sm text-muted-foreground">
+              <div className="text-center py-12 text-gray-400">
+                <FileText className="h-16 w-16 text-blue-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold mb-2 text-white">No content available</h3>
+                <p className="text-sm text-gray-400">
                   This document doesn't have any content to display.
                 </p>
               </div>
