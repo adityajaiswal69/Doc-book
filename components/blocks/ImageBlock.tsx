@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Image, Upload, Link, X, Loader2, AlertCircle, MoreHorizontal, Maximize2, Move } from 'lucide-react';
+import { Image, Upload, Link, X, Loader2, AlertCircle, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+// Card components removed as they're not used
 import { Block, BlockMetadata } from '@/types/editor';
 import { uploadImage, addExternalImage, deleteImage } from '@/actions/actions';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -26,8 +26,7 @@ interface ImageBlockProps {
 export default function ImageBlock({ 
   block, 
   documentId, 
-      onContentChange, 
-    onBlockDelete 
+      onContentChange 
 }: ImageBlockProps) {
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);

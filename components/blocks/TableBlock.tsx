@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Plus, Trash2, MoreHorizontal, BarChart3 } from "lucide-react";
-import { RichBlock, BlockType } from "@/types/editor";
-import RichTextBlock from "../RichTextBlock";
+import { Block } from "@/types/editor";
+
 import { Button } from "@/components/ui/button";
 import { 
   DropdownMenu, 
@@ -14,10 +14,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface TableBlockProps {
-  block: RichBlock;
+  block: Block;
   isSelected: boolean;
   onContentChange: (blockId: string, content: string) => void;
-  onSelectionChange: (selection: any) => void;
+  onSelectionChange: (selection: unknown) => void;
   onKeyDown: (e: React.KeyboardEvent, blockId: string) => void;
   onFocus: (blockId: string) => void;
   onBlur: () => void;
@@ -33,16 +33,13 @@ interface TableCell {
 export default function TableBlock({
   block,
   isSelected,
-  onContentChange,
-  onSelectionChange,
-  onKeyDown,
   onFocus,
   onBlur,
   onTableStructureChange
 }: TableBlockProps) {
   const [tableData, setTableData] = useState<TableCell[][]>([]);
-  const [rows, setRows] = useState(block.metadata.rows || 3);
-  const [columns, setColumns] = useState(block.metadata.columns || 3);
+  const [rows, setRows] = useState(block.metadata?.rows || 3);
+  const [columns, setColumns] = useState(block.metadata?.columns || 3);
   const tableRef = useRef<HTMLTableElement>(null);
 
   // Initialize table data

@@ -38,7 +38,7 @@ import { Button } from "@/components/ui/button";
 
 export default function AppSidebar() {
   const { user, signOut } = useAuth();
-  const { profile, displayName } = useProfile();
+  const { displayName } = useProfile();
   const { 
     documents, 
     loading, 
@@ -176,7 +176,7 @@ export default function AppSidebar() {
     
     try {
       const { moveDocument } = await import('@/actions/actions');
-      const result = await moveDocument(docId, newParentId, user.id);
+      await moveDocument(docId, newParentId, user.id);
       
       // Refresh the entire document list to show the new structure
       refreshDocuments();
@@ -216,7 +216,7 @@ export default function AppSidebar() {
           <div className="flex items-center gap-2">
             <User className="h-5 w-5 text-muted-foreground" />
             <span className="font-medium text-sm">
-              {displayName}'s Workspace
+              {displayName}&apos;s Workspace
             </span>
           </div>
           <Button variant="ghost" size="sm" className="h-6 w-6 p-0">

@@ -50,6 +50,7 @@ export interface CommandItem {
   description: string;
   icon: React.ReactNode;
   shortcut?: string;
+  category: string;
   preview: React.ReactNode;
   action: (content: string) => { newContent: string; newCursorPosition: number };
 }

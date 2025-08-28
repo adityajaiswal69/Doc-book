@@ -1,15 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Lightbulb, Info, AlertTriangle, CheckCircle, XCircle, HelpCircle } from "lucide-react";
-import { RichBlock } from "@/types/editor";
+import React from "react";
+import { Block } from "@/types/editor";
 import RichTextBlock from "../RichTextBlock";
 
 interface CalloutBlockProps {
-  block: RichBlock;
+  block: Block;
   isSelected: boolean;
   onContentChange: (blockId: string, content: string) => void;
-  onSelectionChange: (selection: any) => void;
+  onSelectionChange: (selection: unknown) => void;
   onKeyDown: (e: React.KeyboardEvent, blockId: string) => void;
   onFocus: (blockId: string) => void;
   onBlur: () => void;
@@ -29,7 +29,7 @@ export default function CalloutBlock({
   const [showIconPicker, setShowIconPicker] = useState(false);
 
   // Default icon if none is set
-  const currentIcon = block.metadata.icon || '💡';
+  const currentIcon = block.metadata?.icon || '💡';
 
   // Icon options for callouts
   const iconOptions = [

@@ -1,11 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Document } from "@/types/database";
-import { Block } from "@/types/editor";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { 
   FileText, 
   Folder, 
@@ -26,6 +23,10 @@ interface PreviewDocumentProps {
 }
 
 export default function PreviewDocument({ mainDocument, childDocuments }: PreviewDocumentProps) {
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string>(mainDocument?.id || '');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+
   // Safety check for mainDocument
   if (!mainDocument) {
     return (
@@ -38,25 +39,7 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
     );
   }
 
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string>(mainDocument.id);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
-  // Parse blocks from the main document
-  useEffect(() => {
-    if (mainDocument.blocks_content && Array.isArray(mainDocument.blocks_content)) {
-      setBlocks(mainDocument.blocks_content);
-    } else if (mainDocument.content) {
-      // Fallback to content if blocks_content is not available
-              setBlocks([{
-          id: '1',
-          type: 'text',
-          content: mainDocument.content,
-          orderIndex: 0
-        }]);
-    }
-  }, [mainDocument]);
 
   // Get the currently selected document
   const selectedDocument = selectedDocumentId === mainDocument.id 
@@ -110,6 +93,7 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
     return acc;
   }, {} as Record<string, Document[]>);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const renderDocumentTree = (docs: Document[], parentId: string | null = null) => {
     return docs
       .filter(doc => doc.parent_id === parentId)
@@ -335,7 +319,7 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
                 <FileText className="h-12 w-12 sm:h-16 sm:w-16 text-blue-400 mx-auto mb-4" />
                 <h3 className="text-lg sm:text-xl font-semibold mb-2 text-white">No content available</h3>
                 <p className="text-sm text-gray-400">
-                  This document doesn't have any content to display.
+                  This document doesn&apos;t have any content to display.
                 </p>
               </div>
             )}

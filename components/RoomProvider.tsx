@@ -2,7 +2,7 @@
 // import { ClientSideSuspense, RoomProvider as RoomProviderWrapper } from "@liveblocks/react";
 // import LoadingSpinner from "./ui/LoadingSpinner";
 // import LiveCursorProvider from './LiveCursorProvider'
-export const RoomProvider = ({roomId, children}:{
+export const RoomProvider = ({children}:{
     roomId: string;
     children: React.ReactNode
 }) => {

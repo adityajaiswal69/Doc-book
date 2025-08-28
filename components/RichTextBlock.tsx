@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { RichBlock, BlockType, Selection, FormattingState } from "@/types/editor";
+import { Block, BlockType, Selection } from "@/types/editor";
 
 interface RichTextBlockProps {
-  block: RichBlock;
+  block: Block;
   isSelected: boolean;
   onContentChange: (blockId: string, content: string) => void;
   onSelectionChange: (selection: Selection | null) => void;
@@ -29,7 +29,7 @@ export default function RichTextBlock({
   const [lastContent, setLastContent] = useState(block.content);
 
   // Apply formatting to text content
-  const applyFormatting = useCallback((text: string, metadata: any): string => {
+  const applyFormatting = useCallback((text: string, metadata: Record<string, unknown>): string => {
     let formattedText = text;
 
     // Apply bold

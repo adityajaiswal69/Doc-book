@@ -6,12 +6,12 @@ import { useTransition } from "react";
 import { createDocument } from "@/actions/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Plus, User, Database, Sparkles, Zap, Shield } from "lucide-react";
+import { FileText, Plus, Database, Sparkles, Zap, Shield } from "lucide-react";
 import TestAuth from "@/components/TestAuth";
 import { toast } from "sonner";
 
 export default function HomePage() {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 

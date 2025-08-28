@@ -8,7 +8,7 @@ import { useState } from "react";
 
 export default function DebugAuth() {
   const { user, session, loading } = useAuth();
-  const [testResult, setTestResult] = useState<any>(null);
+  const [testResult, setTestResult] = useState<unknown>(null);
   const [testing, setTesting] = useState(false);
 
   const handleTestConnection = async () => {

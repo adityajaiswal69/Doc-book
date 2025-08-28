@@ -6,13 +6,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Save, Loader2, Lock, ChevronDown, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, X, MoreHorizontal, AlertTriangle, Wrench, FileIcon, Keyboard, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash, Heading3, Heading2, Heading1, Heading1Icon, Share2, ListOrdered } from "lucide-react";
+import { Save, Lock, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, MoreHorizontal, AlertTriangle, Wrench, FileIcon, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash, Heading3, Heading2, Heading1, Share2, ListOrdered } from "lucide-react";
 import ImageBlock from "@/components/blocks/ImageBlock";
 import VideoBlock from "@/components/blocks/VideoBlock";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
 import { Block, BlockType, CommandItem } from "@/types/editor";
-import ShareButton from "./ShareButton";
+
 
 export default function Editor({ documentId }: { documentId?: string } = {}) {
   // Z-index hierarchy:
@@ -27,7 +27,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
   const idFromParams = params.id as string;
   const finalDocumentId = documentId || idFromParams;
   const { user } = useAuth();
-  const { document, loading, error, saving, saveDocument, refetch } = useDocument(finalDocumentId);
+  const { document, loading, error, saving, saveDocument } = useDocument(finalDocumentId);
   
   // Debug logging
   console.log('Editor render:', { finalDocumentId, user: user?.id, document: !!document, loading, error });
@@ -52,8 +52,6 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
   
   // Floating toolbar state
   const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
-  const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 });
-  const [selectedText, setSelectedText] = useState('');
   
   // Refs
   const titleSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -104,6 +102,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       description: "Large section heading",
       icon: <Hash className="h-4 w-4" />,
       shortcut: "#",
+      category: "Basic Blocks",
       preview: <div className="text-2xl font-bold text-white">Heading 1</div>,
       action: (content) => ({
         newContent: content,
@@ -116,6 +115,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       description: "Medium section heading",
       icon: <Hash className="h-4 w-4" />,
       shortcut: "##",
+      category: "Basic Blocks",
       preview: <div className="text-xl font-semibold text-white">Heading 2</div>,
       action: (content) => ({
         newContent: content,
@@ -128,6 +128,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       description: "Small section heading",
       icon: <Hash className="h-4 w-4" />,
       shortcut: "###",
+      category: "Basic Blocks",
       preview: <div className="text-lg font-medium text-white">Heading 3</div>,
       action: (content) => ({
         newContent: content,
@@ -139,6 +140,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       title: "Text",
       description: "Plain text block",
       icon: <Type className="h-4 w-4" />,
+      category: "Basic Blocks",
       preview: <div className="text-gray-200">Plain text block</div>,
       action: (content) => ({
         newContent: content,
@@ -151,6 +153,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       description: "Simple bulleted list",
       icon: <List className="h-4 w-4" />,
       shortcut: "-",
+      category: "Lists",
       preview: (
         <div className="flex items-start">
           <span className="text-blue-400 mr-3 mt-1">•</span>
@@ -168,6 +171,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       description: "Ordered numbered list",
       icon: <List className="h-4 w-4" />,
       shortcut: "1.",
+      category: "Lists",
       preview: (
         <div className="flex items-start">
           <span className="text-blue-400 mr-3 mt-1 min-w-[20px]">1.</span>
@@ -185,6 +189,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       description: "Checkbox task list",
       icon: <CheckSquare className="h-4 w-4" />,
       shortcut: "[ ]",
+      category: "Lists",
       preview: (
         <div className="flex items-start">
           <input type="checkbox" className="mr-3 mt-1 w-4 h-4 text-blue-500 rounded border-gray-600 bg-gray-800" />
@@ -202,6 +207,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       description: "Blockquote for citations",
       icon: <Quote className="h-4 w-4" />,
       shortcut: ">",
+      category: "Media & Content",
       preview: (
         <div className="border-l-4 border-gray-600 pl-4 py-2 italic text-gray-300">
           Quote text
@@ -218,6 +224,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       description: "Code snippet with syntax highlighting",
       icon: <Code className="h-4 w-4" />,
       shortcut: "```",
+      category: "Media & Content",
       preview: (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 font-mono text-sm text-green-400">
           Code block
@@ -234,6 +241,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       description: "Horizontal line separator",
       icon: <Minus className="h-4 w-4" />,
       shortcut: "---",
+      category: "Media & Content",
       preview: <div className="border-t border-gray-600 my-4"></div>,
       action: (content) => ({
         newContent: content,
@@ -245,6 +253,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       title: "Table",
       description: "Data table with rows and columns",
       icon: <Table className="h-4 w-4" />,
+      category: "Advanced",
       preview: (
         <div className="border border-gray-600 rounded-lg overflow-hidden">
           <table className="w-full">
@@ -274,6 +283,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       title: "Uploadable Image",
       description: "Upload image or add external URL",
       icon: <Image className="h-4 w-4" />,
+      category: "Media & Content",
       preview: (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
           <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" />
@@ -290,6 +300,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       title: "Video",
       description: "Insert a video URL",
       icon: <Video className="h-4 w-4" />,
+      category: "Media & Content",
       preview: (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
           <Video className="h-8 w-8 mx-auto text-gray-400 mb-2" />
@@ -297,7 +308,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
         </div>
       ),
       action: (content) => ({
-        newContent: content   ,
+        newContent: content,
         newCursorPosition: content.length
       })
     }
@@ -319,7 +330,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       
       // First try to load from blocks_content JSON
       if (document.blocks_content && Array.isArray(document.blocks_content)) {
-        newBlocks = document.blocks_content.map((block: any, index: number) => {
+        newBlocks = document.blocks_content.map((block: Block, index: number) => {
           const newBlock = {
             id: block.id || `block-${index}`,
             type: block.type as BlockType,
@@ -676,7 +687,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
     let currentListIndex = 1;
     let inNumberedSequence = false;
     
-    return blocks.map((block, index) => {
+    return blocks.map((block) => {
       if (block.type === 'numbered-list') {
         if (!inNumberedSequence) {
           // Starting a new numbered list sequence
@@ -884,25 +895,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
     textarea.style.maxHeight = '';
   }, [blocks]);
 
-  // Debounced resize function for better performance
-  const debouncedResize = useCallback((textarea: HTMLTextAreaElement) => {
-    // Only resize if the textarea is still valid
-    if (!textarea || !textarea.isConnected) return;
-    
-    const blockId = textarea.dataset.blockId;
-    if (blockId && resizeTimeoutsRef.current[blockId]) {
-      clearTimeout(resizeTimeoutsRef.current[blockId]);
-    }
-    
-    if (blockId) {
-      resizeTimeoutsRef.current[blockId] = setTimeout(() => {
-        // Check again before resizing to prevent errors
-        if (textarea && textarea.isConnected) {
-          autoResizeTextarea(textarea);
-        }
-      }, 50); // Increased delay to reduce aggressive resizing
-    }
-  }, [autoResizeTextarea]);
+
 
   // Handle block key events
   const handleBlockKeyDown = useCallback((e: React.KeyboardEvent, blockId: string) => {
@@ -1354,7 +1347,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
         <div className="text-center space-y-4">
           <FileIcon className="h-8 w-8 text-muted-foreground mx-auto" />
           <h3 className="text-lg font-semibold">Document Not Found</h3>
-          <p className="text-sm text-muted-foreground">The document you're looking for doesn't exist.</p>
+          <p className="text-sm text-muted-foreground">The document you&apos;re looking for doesn&apos;t exist.</p>
         </div>
       </div>
     );
@@ -1493,7 +1486,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
               </div>
             ) : (
               <>
-                {blocks.map((block, index) => (
+                {blocks.map((block) => (
                   <div 
                     key={block.id} 
                     className={`relative group py-1 px-3 rounded-lg transition-all duration-200 hover:bg-gray-800/30 ${
@@ -1805,7 +1798,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
           <div className="p-3 border-t border-gray-700 text-xs text-gray-500 bg-gray-900/50 rounded-b-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <span>Type '/' for commands</span>
+                <span>Type &apos;/&apos; for commands</span>
                 <span>↑↓ to navigate</span>
               </div>
               <div className="flex items-center gap-2">
@@ -1822,8 +1815,8 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
         <div 
           className="fixed z-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl backdrop-blur-sm"
           style={{
-            left: toolbarPosition.x,
-            top: toolbarPosition.y,
+            left: '50%',
+            top: '20%',
             transform: 'translate(-50%, -100%)'
           }}
         >

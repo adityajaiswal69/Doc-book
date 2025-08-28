@@ -1,15 +1,13 @@
 "use client";
 
-import { Block, BlockType } from "@/types/editor";
-import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Block } from "@/types/editor";
 
 interface PreviewBlockRendererProps {
   block: Block;
   isPreview?: boolean;
 }
 
-export default function PreviewBlockRenderer({ block, isPreview = true }: PreviewBlockRendererProps) {
+export default function PreviewBlockRenderer({ block }: PreviewBlockRendererProps) {
   // Helper function to render text content
   const renderTextContent = (content: string) => {
     if (!content) return null;
@@ -125,19 +123,7 @@ export default function PreviewBlockRenderer({ block, isPreview = true }: Previe
     case 'divider':
       return <div className="border-t border-gray-600 my-4"></div>;
 
-    case 'callout':
-      return (
-        <div className="mb-4 border-l-4 border-blue-500 bg-gray-800/50 rounded-lg">
-          <div className="p-4">
-            <div className="flex items-start space-x-3">
-              <div className="text-2xl">💡</div>
-              <div className="flex-1 text-white">
-                {renderTextContent(block.content)}
-              </div>
-            </div>
-          </div>
-        </div>
-      );
+
 
     case 'table':
       return (
@@ -151,9 +137,9 @@ export default function PreviewBlockRenderer({ block, isPreview = true }: Previe
                 </tr>
               </thead>
               <tbody>
-                {block.tableData?.map((row, rowIndex) => (
+                {(block.metadata?.tableData as string[][] | undefined)?.map((row: string[], rowIndex: number) => (
                   <tr key={rowIndex} className="border-t border-gray-600">
-                    {row.map((cell, cellIndex) => (
+                    {row.map((cell: string, cellIndex: number) => (
                       <td
                         key={cellIndex}
                         className="px-3 py-2 text-white border-r border-gray-600 last:border-r-0"
@@ -176,7 +162,7 @@ export default function PreviewBlockRenderer({ block, isPreview = true }: Previe
 
     case 'image':
     case 'im':
-      const imageUrl = block.metadata?.url || block.imageUrl || block.content;
+      const imageUrl = block.metadata?.url || block.content;
       const imageWidth = block.metadata?.width || 60; // Default to 60% like in Editor
       const imageCaption = block.metadata?.caption;
       
@@ -227,7 +213,7 @@ export default function PreviewBlockRenderer({ block, isPreview = true }: Previe
       );
 
     case 'video':
-      const videoUrl = block.metadata?.url || block.videoUrl || block.content;
+      const videoUrl = block.metadata?.url || block.content;
       const videoId = videoUrl ? getYouTubeVideoId(videoUrl) : null;
       const videoWidth = block.metadata?.width || 60; // Default to 60% like in Editor
       const videoCaption = block.metadata?.caption;
@@ -301,105 +287,19 @@ export default function PreviewBlockRenderer({ block, isPreview = true }: Previe
         </div>
       );
 
-    case 'toggle-list':
-      return (
-        <details className="mb-4 bg-gray-800/30 rounded-lg p-3">
-          <summary className="cursor-pointer font-medium mb-2 text-white">
-            {block.content || 'Toggle item'}
-          </summary>
-          <div className="pl-4 mt-2 border-l-2 border-gray-600">
-            {block.children?.map((child) => (
-              <PreviewBlockRenderer
-                key={child.id}
-                block={child}
-                isPreview={true}
-              />
-            ))}
-          </div>
-        </details>
-      );
 
-    case 'bookmark':
-      return (
-        <div className="mb-4 bg-gray-800 border border-gray-700 rounded-lg">
-          <div className="p-4">
-            <div className="flex items-start space-x-3">
-              <div className="text-2xl">🔖</div>
-              <div className="flex-1">
-                <a
-                  href={block.url || block.content}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 hover:underline break-all"
-                >
-                  {block.content || block.url}
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
 
-    case 'columns':
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          {block.columns?.map((column, index) => (
-            <div key={index} className="space-y-2 bg-gray-800/20 p-3 rounded-lg">
-              {column.map((childBlock) => (
-                <PreviewBlockRenderer
-                  key={childBlock.id}
-                  block={childBlock}
-                  isPreview={true}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-      );
 
-    case 'math':
-    case 'equation':
-      return (
-        <div className="bg-gray-800 border border-gray-700 p-4 rounded-lg text-center mb-4">
-          <div className="text-2xl mb-2 text-blue-400">∑</div>
-          <div className="font-mono text-white">{renderTextContent(block.content)}</div>
-        </div>
-      );
 
-    case 'mention':
-      return (
-        <span className="bg-blue-900/50 text-blue-200 px-2 py-1 rounded border border-blue-700">
-          @{block.content}
-        </span>
-      );
 
-    case 'page-reference':
-      return (
-        <div className="mb-4 bg-gray-800 border border-gray-700 rounded-lg">
-          <div className="p-4">
-            <div className="flex items-start space-x-3">
-              <div className="text-2xl">📄</div>
-              <div className="flex-1">
-                <span className="text-blue-400">{block.content}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
 
-    case 'database-reference':
-      return (
-        <div className="mb-4 bg-gray-800 border border-gray-700 rounded-lg">
-          <div className="p-4">
-            <div className="flex items-start space-x-3">
-              <div className="text-2xl">🗄️</div>
-              <div className="flex-1">
-                <span className="text-blue-400">{block.content}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
+
+
+
+
+
+
+
 
     // Default case - render as text
     case 'text':

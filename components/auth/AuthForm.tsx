@@ -44,16 +44,17 @@ export default function AuthForm() {
           toast.info("Please check your email for confirmation link!");
         }
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
         if (error) throw error;
       }
-    } catch (error: any) {
-      setError(error.message);
-      toast.error(error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -78,14 +79,15 @@ export default function AuthForm() {
       }
       
       // OAuth redirect will happen automatically, so we don't need to do anything else
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle specific error cases
-      if (error.message?.includes('OAuth')) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      if (errorMessage.includes('OAuth')) {
         toast.error('OAuth configuration error. Please check your Google credentials.');
-      } else if (error.message?.includes('redirect')) {
+      } else if (errorMessage.includes('redirect')) {
         toast.error('Redirect configuration error. Please check your app settings.');
       } else {
-        toast.error(error.message || 'Failed to sign in with Google');
+        toast.error(errorMessage || 'Failed to sign in with Google');
       }
       
       setLoading(false);

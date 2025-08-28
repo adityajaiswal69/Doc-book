@@ -10,13 +10,13 @@ interface BlockRendererProps {
   block: Block;
   isSelected: boolean;
   documentId: string;
-  onContentChange: (blockId: string, content: string, metadata?: any) => void;
-  onSelectionChange: (selection: any) => void;
+  onContentChange: (blockId: string, content: string, metadata?: unknown) => void;
+  onSelectionChange: (selection: unknown) => void;
   onKeyDown: (e: React.KeyboardEvent, blockId: string) => void;
   onFocus: (blockId: string) => void;
   onBlur: () => void;
   onBlockTypeChange: (blockId: string, newType: BlockType) => void;
-  onFormatChange: (blockId: string, format: string, value: any) => void;
+  onFormatChange: (blockId: string, format: string, value: unknown) => void;
   onDuplicate: (blockId: string) => void;
   onDelete: (blockId: string) => void;
   onAddComment: (blockId: string) => void;
@@ -35,15 +35,8 @@ export default function BlockRenderer({
   onKeyDown,
   onFocus,
   onBlur,
-  onBlockTypeChange,
-  onFormatChange,
-  onDuplicate,
   onDelete,
-  onAddComment,
-  onAddChild,
-  onIconChange,
-  onTableStructureChange,
-  onDragStart
+  onTableStructureChange
 }: BlockRendererProps) {
   // Common props for all blocks
   const commonProps = {

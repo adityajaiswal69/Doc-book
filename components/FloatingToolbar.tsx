@@ -21,7 +21,7 @@ import { Selection, FormattingState } from "@/types/editor";
 interface FloatingToolbarProps {
   selection: Selection | null;
   formatting: FormattingState;
-  onFormatChange: (format: string, value: any) => void;
+  onFormatChange: (format: string, value: unknown) => void;
   onClose: () => void;
 }
 

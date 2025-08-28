@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
-import { RichBlock, BlockType } from "@/types/editor";
+import { Block } from "@/types/editor";
 import RichTextBlock from "../RichTextBlock";
 
 interface ToggleListBlockProps {
-  block: RichBlock;
+  block: Block;
   isSelected: boolean;
   onContentChange: (blockId: string, content: string) => void;
-  onSelectionChange: (selection: any) => void;
+  onSelectionChange: (selection: unknown) => void;
   onKeyDown: (e: React.KeyboardEvent, blockId: string) => void;
   onFocus: (blockId: string) => void;
   onBlur: () => void;
@@ -26,8 +26,8 @@ export default function ToggleListBlock({
   onBlur,
   onAddChild
 }: ToggleListBlockProps) {
-  const [isExpanded, setIsExpanded] = useState(!block.metadata.collapsed);
-  const hasChildren = block.children && block.children.length > 0;
+  const [isExpanded, setIsExpanded] = useState(!block.metadata?.collapsed);
+  const hasChildren = false; // Block type doesn't have children property
 
   const handleToggle = () => {
     setIsExpanded(!isExpanded);
@@ -86,38 +86,7 @@ export default function ToggleListBlock({
         </button>
       </div>
 
-      {/* Toggle Content */}
-      {isExpanded && hasChildren && (
-        <div className="ml-6 mt-2 space-y-1 border-l border-gray-700 pl-4">
-          {block.children?.map((child) => (
-            <div key={child.id} className="relative group/child">
-              {/* Render child blocks recursively */}
-              {child.type === BlockType.TOGGLE_LIST ? (
-                <ToggleListBlock
-                  block={child}
-                  isSelected={false}
-                  onContentChange={onContentChange}
-                  onSelectionChange={onSelectionChange}
-                  onKeyDown={onKeyDown}
-                  onFocus={onFocus}
-                  onBlur={onBlur}
-                  onAddChild={onAddChild}
-                />
-              ) : (
-                <RichTextBlock
-                  block={child}
-                  isSelected={false}
-                  onContentChange={onContentChange}
-                  onSelectionChange={onSelectionChange}
-                  onKeyDown={onKeyDown}
-                  onFocus={onFocus}
-                  onBlur={onBlur}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Toggle Content - Children not supported in current Block type */}
 
       {/* Empty State */}
       {isExpanded && !hasChildren && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -82,7 +82,7 @@ export default function DocumentTree({
       await onRenameDocument(editingId, editTitle.trim());
       setEditingId(null);
       setEditTitle("");
-    } catch (error) {
+    } catch {
       toast.error("Failed to rename document");
     }
   };
@@ -181,7 +181,7 @@ export default function DocumentTree({
         await onMoveDocument(draggedItem.id, newParentId);
         toast.success('Document moved successfully');
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to move document');
     } finally {
       setDraggedItem(null);

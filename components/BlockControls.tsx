@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React from "react";
 import { 
   GripVertical, 
   Bold, 
@@ -19,9 +19,7 @@ import {
   AlignRight,
   Palette,
   Image as ImageIcon,
-  Video as VideoIcon,
-  FileText,
-  Database
+  Video as VideoIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -30,21 +28,19 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger
+
 } from "@/components/ui/dropdown-menu";
-import { RichBlock, BlockType } from "@/types/editor";
+import { Block, BlockType } from "@/types/editor";
 
 interface BlockControlsProps {
-  block: RichBlock;
+  block: Block;
   isSelected: boolean;
   onBlockTypeChange: (blockId: string, newType: BlockType) => void;
-  onFormatChange: (blockId: string, format: string, value: any) => void;
+  onFormatChange: (blockId: string, format: string, value: unknown) => void;
   onDuplicate: (blockId: string) => void;
   onDelete: (blockId: string) => void;
   onAddComment: (blockId: string) => void;
-  onDragStart: (e: React.DragEvent, block: RichBlock) => void;
+  onDragStart: (e: React.DragEvent, block: Block) => void;
 }
 
 export default function BlockControls({
@@ -57,30 +53,22 @@ export default function BlockControls({
   onAddComment,
   onDragStart
 }: BlockControlsProps) {
-  const [showFormatting, setShowFormatting] = useState(false);
+
 
   const blockTypeOptions = [
-    { value: BlockType.PARAGRAPH, label: "Text", icon: "T" },
-    { value: BlockType.HEADING_1, label: "Heading 1", icon: "H1" },
-    { value: BlockType.HEADING_2, label: "Heading 2", icon: "H2" },
-    { value: BlockType.HEADING_3, label: "Heading 3", icon: "H3" },
-    { value: BlockType.BULLETED_LIST, label: "Bulleted list", icon: "•" },
-    { value: BlockType.NUMBERED_LIST, label: "Numbered list", icon: "1." },
-    { value: BlockType.TOGGLE_LIST, label: "Toggle list", icon: "▶" },
-    { value: BlockType.TODO_LIST, label: "To-do list", icon: "☐" },
-    { value: BlockType.QUOTE, label: "Quote", icon: "❝" },
-    { value: BlockType.CODE_BLOCK, label: "Code block", icon: "{}" },
-    { value: BlockType.DIVIDER, label: "Divider", icon: "—" },
-    { value: BlockType.TABLE, label: "Table", icon: "⊞" },
-    { value: BlockType.IMAGE, label: "Image", icon: <ImageIcon className="h-4 w-4" /> },
-    { value: BlockType.VIDEO, label: "Video", icon: <VideoIcon className="h-4 w-4" /> },
-    { value: BlockType.BOOKMARK, label: "Bookmark", icon: "🔖" },
-    { value: BlockType.CALLOUT, label: "Callout", icon: "💡" },
-    { value: BlockType.COLUMNS, label: "Columns", icon: "⊞" },
-    { value: BlockType.MATH, label: "Math", icon: "∑" },
-    { value: BlockType.MENTION, label: "Mention", icon: "@" },
-    { value: BlockType.PAGE_REFERENCE, label: "Page reference", icon: <FileText className="h-4 w-4" /> },
-    { value: BlockType.DATABASE_REFERENCE, label: "Database", icon: <Database className="h-4 w-4" /> }
+    { value: "text" as BlockType, label: "Text", icon: "T" },
+    { value: "heading-1" as BlockType, label: "Heading 1", icon: "H1" },
+    { value: "heading-2" as BlockType, label: "Heading 2", icon: "H2" },
+    { value: "heading-3" as BlockType, label: "Heading 3", icon: "H3" },
+    { value: "bulleted-list" as BlockType, label: "Bulleted list", icon: "•" },
+    { value: "numbered-list" as BlockType, label: "Numbered list", icon: "1." },
+    { value: "todo-list" as BlockType, label: "To-do list", icon: "☐" },
+    { value: "quote" as BlockType, label: "Quote", icon: "❝" },
+    { value: "code-block" as BlockType, label: "Code block", icon: "{}" },
+    { value: "divider" as BlockType, label: "Divider", icon: "—" },
+    { value: "table" as BlockType, label: "Table", icon: "⊞" },
+    { value: "image" as BlockType, label: "Image", icon: <ImageIcon className="h-4 w-4" /> },
+    { value: "video" as BlockType, label: "Video", icon: <VideoIcon className="h-4 w-4" /> }
   ];
 
   const currentBlockType = blockTypeOptions.find(opt => opt.value === block.type);
@@ -168,8 +156,8 @@ export default function BlockControls({
         <Button
           variant="ghost"
           size="sm"
-          className={`h-6 w-6 p-0 ${block.metadata.isBold ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange(block.id, 'isBold', !block.metadata.isBold)}
+          className={`h-6 w-6 p-0 ${block.metadata?.isBold ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          onClick={() => onFormatChange(block.id, 'isBold', !block.metadata?.isBold)}
           title="Bold (Ctrl+B)"
         >
           <Bold className="h-3 w-3" />
@@ -178,8 +166,8 @@ export default function BlockControls({
         <Button
           variant="ghost"
           size="sm"
-          className={`h-6 w-6 p-0 ${block.metadata.isItalic ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange(block.id, 'isItalic', !block.metadata.isItalic)}
+          className={`h-6 w-6 p-0 ${block.metadata?.isItalic ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          onClick={() => onFormatChange(block.id, 'isItalic', !block.metadata?.isItalic)}
           title="Italic (Ctrl+I)"
         >
           <Italic className="h-3 w-3" />
@@ -188,8 +176,8 @@ export default function BlockControls({
         <Button
           variant="ghost"
           size="sm"
-          className={`h-6 w-6 p-0 ${block.metadata.isUnderlined ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange(block.id, 'isUnderlined', !block.metadata.isUnderlined)}
+          className={`h-6 w-6 p-0 ${block.metadata?.isUnderlined ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          onClick={() => onFormatChange(block.id, 'isUnderlined', !block.metadata?.isUnderlined)}
           title="Underline (Ctrl+U)"
         >
           <Underline className="h-3 w-3" />
@@ -198,8 +186,8 @@ export default function BlockControls({
         <Button
           variant="ghost"
           size="sm"
-          className={`h-6 w-6 p-0 ${block.metadata.isStrikethrough ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange(block.id, 'isStrikethrough', !block.metadata.isStrikethrough)}
+          className={`h-6 w-6 p-0 ${block.metadata?.isStrikethrough ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          onClick={() => onFormatChange(block.id, 'isStrikethrough', !block.metadata?.isStrikethrough)}
           title="Strikethrough"
         >
           <Strikethrough className="h-3 w-3" />
@@ -208,8 +196,8 @@ export default function BlockControls({
         <Button
           variant="ghost"
           size="sm"
-          className={`h-6 w-6 p-0 ${block.metadata.isCode ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange(block.id, 'isCode', !block.metadata.isCode)}
+          className={`h-6 w-6 p-0 ${block.metadata?.isCode ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          onClick={() => onFormatChange(block.id, 'isCode', !block.metadata?.isCode)}
           title="Code (Ctrl+Shift+K)"
         >
           <Code className="h-3 w-3" />
@@ -226,9 +214,9 @@ export default function BlockControls({
               className="h-6 w-6 p-0 text-gray-400 hover:text-white"
               title="Text alignment"
             >
-              {block.metadata.textAlign === 'center' ? (
+              {block.metadata?.textAlign === 'center' ? (
                 <AlignCenter className="h-3 w-3" />
-              ) : block.metadata.textAlign === 'right' ? (
+              ) : block.metadata?.textAlign === 'right' ? (
                 <AlignRight className="h-3 w-3" />
               ) : (
                 <AlignLeft className="h-3 w-3" />
@@ -281,7 +269,7 @@ export default function BlockControls({
                     key={color.name}
                     onClick={() => onFormatChange(block.id, 'color', color.value)}
                     className={`w-6 h-6 rounded cursor-pointer flex items-center justify-center ${
-                      block.metadata.color === color.value ? 'ring-2 ring-blue-500' : ''
+                      block.metadata?.color === color.value ? 'ring-2 ring-blue-500' : ''
                     }`}
                   >
                     <div className={`w-3 h-3 rounded-full ${color.color}`}></div>
@@ -313,7 +301,7 @@ export default function BlockControls({
                     key={bg.name}
                     onClick={() => onFormatChange(block.id, 'backgroundColor', bg.value)}
                     className={`w-6 h-6 rounded cursor-pointer flex items-center justify-center ${
-                      block.metadata.backgroundColor === bg.value ? 'ring-2 ring-blue-500' : ''
+                      block.metadata?.backgroundColor === bg.value ? 'ring-2 ring-blue-500' : ''
                     }`}
                   >
                     <div className={`w-3 h-3 rounded ${bg.bg}`}></div>
@@ -330,9 +318,9 @@ export default function BlockControls({
         <Button
           variant="ghost"
           size="sm"
-          className={`h-6 w-6 p-0 ${block.metadata.link ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          className={`h-6 w-6 p-0 ${block.metadata?.link ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
           onClick={() => {
-            const url = prompt('Enter URL:', block.metadata.link || '');
+            const url = prompt('Enter URL:', block.metadata?.link || '');
             if (url !== null) {
               onFormatChange(block.id, 'link', url);
             }

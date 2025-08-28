@@ -14,16 +14,14 @@ import {
   Image, 
   Video, 
   Link, 
-  BookOpen, 
   Database,
-  MessageSquare,
   Lightbulb,
   Columns,
-  Function,
+  Calculator,
   AtSign,
   FileText
 } from "lucide-react";
-import { CommandItem, BlockType } from "@/types/editor";
+import { CommandItem } from "@/types/editor";
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -294,7 +292,7 @@ export default function CommandPalette({
       id: "math",
       title: "Math",
       description: "Mathematical equations",
-      icon: <Function className="h-4 w-4" />,
+      icon: <Calculator className="h-4 w-4" />,
       shortcut: "/math",
       category: "Advanced",
       preview: (
