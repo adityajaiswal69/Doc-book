@@ -1,285 +1,196 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { 
-  Bold, 
-  Italic, 
-  Underline, 
-  Strikethrough, 
-  Code, 
-  Link, 
-  Palette,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  X
-} from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Bold, Italic, Underline, Strikethrough, Code, Link, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Selection, FormattingState } from "@/types/editor";
+import { Block } from "@/types/editor";
 
 interface FloatingToolbarProps {
-  selection: Selection | null;
-  formatting: FormattingState;
-  onFormatChange: (format: string, value: unknown) => void;
-  onClose: () => void;
+  block: Block;
+  onFormatChange: (blockId: string, format: string, value: unknown) => void;
 }
 
-export default function FloatingToolbar({
-  selection,
-  formatting,
-  onFormatChange,
-  onClose
-}: FloatingToolbarProps) {
-  const [showLinkInput, setShowLinkInput] = useState(false);
-  const [linkUrl, setLinkUrl] = useState(formatting.link || '');
+export default function FloatingToolbar({ block, onFormatChange }: FloatingToolbarProps) {
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [isVisible, setIsVisible] = useState(false);
 
-  // Calculate toolbar position based on selection
   useEffect(() => {
-    if (!selection) return;
-
-    const updatePosition = () => {
-      const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return;
-
-      const range = sel.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      const toolbar = toolbarRef.current;
       
-      if (rect.width === 0 || rect.height === 0) return;
+      if (!toolbar || !selection) return;
 
-      const toolbarHeight = 48; // Approximate toolbar height
-      const toolbarWidth = 320; // Approximate toolbar width
+      const selectedText = selection.toString().trim();
       
-      let top = rect.top - toolbarHeight - 10;
-      let left = rect.left + (rect.width / 2) - (toolbarWidth / 2);
-
-      // Ensure toolbar stays within viewport
-      if (top < 10) {
-        top = rect.bottom + 10;
+      if (selectedText.length > 0 && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        
+        // Check if selection is within the current block or any textarea with our block id
+        const blockElement = document.querySelector(`textarea[data-block-id="${block.id}"]`) || 
+                           document.querySelector(`[data-block-id="${block.id}"]`);
+        
+        let isInCurrentBlock = false;
+        if (blockElement) {
+          // Check if the selection is within this specific block
+          const ancestor = range.commonAncestorContainer;
+          isInCurrentBlock = blockElement.contains(ancestor) || blockElement === ancestor;
+        }
+        
+        if (isInCurrentBlock && rect.width > 0 && rect.height > 0) {
+          // Show toolbar after a small delay to ensure it renders properly
+          setTimeout(() => {
+            const toolbarRect = toolbar.getBoundingClientRect();
+            const x = rect.left + (rect.width / 2) - (toolbarRect.width / 2);
+            const y = rect.top - toolbarRect.height - 12;
+            
+            // Ensure toolbar stays within viewport
+            const finalX = Math.max(8, Math.min(x, window.innerWidth - toolbarRect.width - 8));
+            const finalY = Math.max(8, y);
+            
+            toolbar.style.left = `${finalX}px`;
+            toolbar.style.top = `${finalY}px`;
+            setIsVisible(true);
+          }, 50);
+        } else {
+          setIsVisible(false);
+        }
+      } else {
+        setIsVisible(false);
       }
-      if (left < 10) {
-        left = 10;
-      }
-      if (left + toolbarWidth > window.innerWidth - 10) {
-        left = window.innerWidth - toolbarWidth - 10;
-      }
-
-      setPosition({ top, left });
     };
 
-    // Update position immediately and on scroll/resize
-    updatePosition();
-    window.addEventListener('scroll', updatePosition, true);
-    window.addEventListener('resize', updatePosition);
+    const handleMouseUp = (e: MouseEvent) => {
+      // Delay to allow selection to complete
+      setTimeout(() => {
+        handleSelectionChange();
+      }, 100);
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // Handle keyboard selection
+      setTimeout(() => {
+        handleSelectionChange();
+      }, 50);
+    };
+
+    // Initial check
+    handleSelectionChange();
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('keyup', handleKeyUp);
 
     return () => {
-      window.removeEventListener('scroll', updatePosition, true);
-      window.removeEventListener('resize', updatePosition);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selection]);
+  }, [block.id]);
 
-  // Handle link submission
-  const handleLinkSubmit = () => {
-    if (linkUrl.trim()) {
-      onFormatChange('link', linkUrl.trim());
+  const applyFormat = (format: string, value?: unknown) => {
+    // Apply formatting and maintain selection
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      onFormatChange(block.id, format, value !== undefined ? value : !block.metadata?.[format]);
     }
-    setShowLinkInput(false);
-    setLinkUrl('');
   };
 
-  // Handle link removal
-  const handleLinkRemove = () => {
-    onFormatChange('link', null);
-    setShowLinkInput(false);
-    setLinkUrl('');
-  };
-
-  // Close toolbar when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (toolbarRef.current && !toolbarRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
-
-  if (!selection) return null;
+  if (!isVisible) return null;
 
   return (
     <div
       ref={toolbarRef}
-      className="fixed z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl backdrop-blur-sm"
-      style={{
-        top: position.top,
-        left: position.left,
-        transform: 'translateY(-50%)'
-      }}
+      className="fixed bg-gray-900 border border-gray-700 rounded-lg p-1 shadow-2xl z-[90] backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-150"
+      style={{ pointerEvents: 'auto' }}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.preventDefault()} // Prevent losing selection
     >
-      <div className="flex items-center gap-1 p-1">
-        {/* Text Formatting */}
+      <div className="flex items-center gap-0.5">
+        {/* Bold */}
         <Button
           variant="ghost"
           size="sm"
-          className={`h-8 w-8 p-0 ${formatting.isBold ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange('isBold', !formatting.isBold)}
+          className={`h-7 w-7 p-0 ${block.metadata?.isBold ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          onClick={() => applyFormat('isBold')}
           title="Bold (Ctrl+B)"
         >
-          <Bold className="h-4 w-4" />
+          <Bold className="h-3 w-3" />
         </Button>
-        
+
+        {/* Italic */}
         <Button
           variant="ghost"
           size="sm"
-          className={`h-8 w-8 p-0 ${formatting.isItalic ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange('isItalic', !formatting.isItalic)}
+          className={`h-7 w-7 p-0 ${block.metadata?.isItalic ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          onClick={() => applyFormat('isItalic')}
           title="Italic (Ctrl+I)"
         >
-          <Italic className="h-4 w-4" />
+          <Italic className="h-3 w-3" />
         </Button>
-        
+
+        {/* Underline */}
         <Button
           variant="ghost"
           size="sm"
-          className={`h-8 w-8 p-0 ${formatting.isUnderlined ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange('isUnderlined', !formatting.isUnderlined)}
+          className={`h-7 w-7 p-0 ${block.metadata?.isUnderlined ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          onClick={() => applyFormat('isUnderlined')}
           title="Underline (Ctrl+U)"
         >
-          <Underline className="h-4 w-4" />
+          <Underline className="h-3 w-3" />
         </Button>
-        
+
+        {/* Strikethrough */}
         <Button
           variant="ghost"
           size="sm"
-          className={`h-8 w-8 p-0 ${formatting.isStrikethrough ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange('isStrikethrough', !formatting.isStrikethrough)}
+          className={`h-7 w-7 p-0 ${block.metadata?.isStrikethrough ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          onClick={() => applyFormat('isStrikethrough')}
           title="Strikethrough"
         >
-          <Strikethrough className="h-4 w-4" />
+          <Strikethrough className="h-3 w-3" />
         </Button>
-        
+
+        {/* Code */}
         <Button
           variant="ghost"
           size="sm"
-          className={`h-8 w-8 p-0 ${formatting.isCode ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange('isCode', !formatting.isCode)}
+          className={`h-7 w-7 p-0 ${block.metadata?.isCode ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          onClick={() => applyFormat('isCode')}
           title="Code (Ctrl+Shift+K)"
         >
-          <Code className="h-4 w-4" />
+          <Code className="h-3 w-3" />
         </Button>
 
-        <div className="w-px h-6 bg-gray-600 mx-1" />
-
-        {/* Text Alignment */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className={`h-8 w-8 p-0 ${formatting.textAlign === 'left' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange('textAlign', 'left')}
-          title="Align left"
-        >
-          <AlignLeft className="h-4 w-4" />
-        </Button>
-        
-        <Button
-          variant="ghost"
-          size="sm"
-          className={`h-8 w-8 p-0 ${formatting.textAlign === 'center' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange('textAlign', 'center')}
-          title="Align center"
-        >
-          <AlignCenter className="h-4 w-4" />
-        </Button>
-        
-        <Button
-          variant="ghost"
-          size="sm"
-          className={`h-8 w-8 p-0 ${formatting.textAlign === 'right' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => onFormatChange('textAlign', 'right')}
-          title="Align right"
-        >
-          <AlignRight className="h-4 w-4" />
-        </Button>
-
-        <div className="w-px h-6 bg-gray-600 mx-1" />
-
-        {/* Text Color */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0 text-gray-400 hover:text-white"
-          onClick={() => onFormatChange('color', formatting.color === 'text-blue-500' ? null : 'text-blue-500')}
-          title="Text color"
-        >
-          <Palette className="h-4 w-4" />
-        </Button>
+        <div className="w-px h-4 bg-gray-600 mx-1" />
 
         {/* Link */}
         <Button
           variant="ghost"
           size="sm"
-          className={`h-8 w-8 p-0 ${formatting.link ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
-          onClick={() => setShowLinkInput(!showLinkInput)}
+          className={`h-7 w-7 p-0 ${block.metadata?.link ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          onClick={() => {
+            const url = prompt('Enter URL:', block.metadata?.link || '');
+            if (url !== null) {
+              applyFormat('link', url);
+            }
+          }}
           title="Add link (Ctrl+K)"
         >
-          <Link className="h-4 w-4" />
+          <Link className="h-3 w-3" />
         </Button>
 
-        {/* Close Button */}
+        {/* Color picker could go here */}
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 w-8 p-0 text-gray-400 hover:text-white"
-          onClick={onClose}
-          title="Close toolbar"
+          className="h-7 w-7 p-0 text-gray-400 hover:text-white"
+          title="Text color"
         >
-          <X className="h-4 w-4" />
+          <Palette className="h-3 w-3" />
         </Button>
       </div>
-
-      {/* Link Input */}
-      {showLinkInput && (
-        <div className="p-2 border-t border-gray-700 bg-gray-800/50">
-          <div className="flex items-center gap-2">
-            <Input
-              value={linkUrl}
-              onChange={(e) => setLinkUrl(e.target.value)}
-              placeholder="Enter URL..."
-              className="h-7 text-sm bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleLinkSubmit();
-                } else if (e.key === 'Escape') {
-                  setShowLinkInput(false);
-                }
-              }}
-              autoFocus
-            />
-            <Button
-              size="sm"
-              onClick={handleLinkSubmit}
-              className="h-7 px-2 text-xs"
-            >
-              Add
-            </Button>
-            {formatting.link && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLinkRemove}
-                className="h-7 px-2 text-xs text-red-400 hover:text-red-300"
-              >
-                Remove
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-

@@ -6,9 +6,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Save, Lock, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, MoreHorizontal, AlertTriangle, Wrench, FileIcon, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash, Heading3, Heading2, Heading1, Share2, ListOrdered } from "lucide-react";
+import { Save, Lock, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, AlertTriangle, Wrench, FileIcon, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash, Heading3, Heading2, Heading1, Share2, ListOrdered } from "lucide-react";
 import ImageBlock from "@/components/blocks/ImageBlock";
 import VideoBlock from "@/components/blocks/VideoBlock";
+import BlockControls from "@/components/BlockControls";
+import FloatingToolbar from "@/components/FloatingToolbar";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
 import { Block, BlockType, CommandItem } from "@/types/editor";
@@ -32,9 +34,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
   // Debug logging
   console.log('Editor render:', { finalDocumentId, user: user?.id, document: !!document, loading, error });
   
-  const [title, setTitle] = useState("");
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [titleChanged, setTitleChanged] = useState(false);
   const [contentChanged, setContentChanged] = useState(false);
 
   // Command palette state
@@ -43,8 +43,9 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   
-  // Block menu state
-  const [openMenuBlockId, setOpenMenuBlockId] = useState<string | null>(null);
+  // Block selection state for controls
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
   
   // Drag and drop state
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
@@ -54,9 +55,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
   const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
   
   // Refs
-  const titleSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const contentSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isSavingTitleRef = useRef(false);
   const isSavingContentRef = useRef(false);
   const blockRefs = useRef<{ [key: string]: HTMLTextAreaElement }>({});
   const commandPaletteRef = useRef<HTMLDivElement>(null);
@@ -322,8 +321,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
 
   // Initialize blocks from document content
   useEffect(() => {
-    if (document && !titleChanged && !contentChanged) {
-      setTitle(document.title || "");
+    if (document && !contentChanged) {
       
       // Parse content into blocks - try JSON first, then fallback to plain text
       let newBlocks: Block[] = [];
@@ -460,7 +458,6 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       
       setBlocks(newBlocks);
       
-      setTitleChanged(false);
       setContentChanged(false);
     }
   }, [document?.id]);
@@ -473,45 +470,6 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       });
     };
   }, []);
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (openMenuBlockId && !(event.target as Element).closest('[data-block-menu]')) {
-        setOpenMenuBlockId(null);
-      }
-    };
-
-    if (typeof window !== 'undefined') {
-      window.document.addEventListener('mousedown', handleClickOutside);
-      return () => window.document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [openMenuBlockId]);
-
-  // Auto-save title changes
-  const handleTitleChange = useCallback(async (newTitle: string) => {
-    setTitle(newTitle);
-    setTitleChanged(true);
-    
-    if (titleSaveTimeoutRef.current) {
-      clearTimeout(titleSaveTimeoutRef.current);
-    }
-    
-    titleSaveTimeoutRef.current = setTimeout(async () => {
-      if (isSavingTitleRef.current) return;
-      
-      try {
-        isSavingTitleRef.current = true;
-        await saveDocument({ title: newTitle });
-        setTitleChanged(false);
-      } catch (error) {
-        console.error('Failed to save title:', error);
-        setTitleChanged(true);
-      } finally {
-        isSavingTitleRef.current = false;
-      }
-    }, 1000);
-  }, [saveDocument]);
 
   // Handle block content changes
   const handleBlockChange = useCallback(async (blockId: string, newContent: string, newType?: BlockType) => {
@@ -758,13 +716,28 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       return finalBlocks;
     });
     
-    // Focus new block
+    // Focus new block and scroll it into view
     setTimeout(() => {
       const blockElement = blockRefs.current[newBlock.id];
       if (blockElement) {
         blockElement.focus();
+        // Smooth scroll to the new block with proper offset for header
+        blockElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start'
+        });
+        
+        // Additional scroll adjustment to account for sticky header
+        setTimeout(() => {
+          if (typeof window !== 'undefined') {
+            const scrollContainer = window.document.querySelector('.mobile-scroll');
+            if (scrollContainer) {
+              scrollContainer.scrollBy({ top: -80, behavior: 'smooth' });
+            }
+          }
+        }, 200);
       }
-    }, 10);
+    }, 100);
   }, [blocks, updateListIndices, saveDocument]);
 
   // Drag and drop handlers
@@ -972,6 +945,104 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
     }
   }, [blocks, addBlock, updateListIndices, saveDocument]);
 
+  // Block controls handler functions
+  const handleBlockTypeChange = useCallback((blockId: string, newType: BlockType) => {
+    setBlocks(prev => prev.map(block => 
+      block.id === blockId ? { ...block, type: newType } : block
+    ));
+    setContentChanged(true);
+  }, []);
+
+  const handleFormatChange = useCallback((blockId: string, format: string, value: unknown) => {
+    setBlocks(prev => prev.map(block => 
+      block.id === blockId 
+        ? { ...block, metadata: { ...block.metadata, [format]: value } }
+        : block
+    ));
+    setContentChanged(true);
+  }, []);
+
+  const handleDuplicateBlock = useCallback((blockId: string) => {
+    const blockToDuplicate = blocks.find(b => b.id === blockId);
+    if (blockToDuplicate) {
+      const duplicatedBlock = {
+        ...blockToDuplicate,
+        id: `block-${Date.now()}`
+      };
+      setBlocks(prev => {
+        const index = prev.findIndex(b => b.id === blockId);
+        const newBlocks = [...prev];
+        newBlocks.splice(index + 1, 0, duplicatedBlock);
+        
+        // Update order indices for all blocks
+        const updatedBlocks = newBlocks.map((block, idx) => ({
+          ...block,
+          orderIndex: idx
+        }));
+        
+        const finalBlocks = updateListIndices(updatedBlocks);
+        
+        // Save the updated blocks to the backend
+        (async () => {
+          try {
+            setContentChanged(true);
+            await saveDocument({ blocks_content: finalBlocks });
+            setContentChanged(false);
+          } catch (error) {
+            console.error('Failed to save after block duplication:', error);
+            setContentChanged(true);
+          }
+        })();
+        
+        return finalBlocks;
+      });
+      toast.success("Block duplicated");
+    }
+  }, [blocks, updateListIndices, saveDocument]);
+
+  const handleDeleteBlock = useCallback((blockId: string) => {
+    if (blocks.length > 1) {
+      setBlocks(prev => {
+        const filteredBlocks = prev.filter(b => b.id !== blockId);
+        
+        // Update order indices for remaining blocks
+        const updatedBlocks = filteredBlocks.map((block, idx) => ({
+          ...block,
+          orderIndex: idx
+        }));
+        
+        const finalBlocks = updateListIndices(updatedBlocks);
+        
+        // Save the updated blocks to the backend
+        (async () => {
+          try {
+            setContentChanged(true);
+            await saveDocument({ blocks_content: finalBlocks });
+            setContentChanged(false);
+          } catch (error) {
+            console.error('Failed to save after block deletion:', error);
+            setContentChanged(true);
+          }
+        })();
+        
+        return finalBlocks;
+      });
+      toast.success("Block deleted");
+    } else {
+      toast.error("Cannot delete the last block");
+    }
+  }, [blocks, updateListIndices, saveDocument]);
+
+  const handleAddComment = useCallback((blockId: string) => {
+    // Placeholder for comment functionality
+    console.log('Add comment to block:', blockId);
+  }, []);
+
+  const handleBlockControlsDragStart = useCallback((e: React.DragEvent, block: Block) => {
+    setDraggedBlockId(block.id);
+    e.dataTransfer.setData('text/plain', block.id);
+  }, []);
+
   // Render block based on type
   const renderBlock = (block: Block) => {
     const commonProps = {
@@ -979,6 +1050,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
         if (el) {
           blockRefs.current[block.id] = el;
           el.dataset.blockId = block.id;
+          el.setAttribute('data-block-id', block.id);
           
           // Initialize auto-height immediately
           autoResizeTextarea(el);
@@ -1355,110 +1427,16 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
 
   return (
     <div className="flex flex-col h-full relative mobile-keyboard-safe">
-      {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0 mobile-safe-top">
-        <div className="flex items-center justify-between mobile-safe-area py-3 gap-2">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-muted-foreground" />
-              <Input
-                value={title}
-                onChange={(e) => handleTitleChange(e.target.value)}
-                placeholder="Untitled Document"
-                className="text-responsive-lg font-semibold border-none shadow-none focus-visible:ring-0 px-0 h-auto min-w-[200px] bg-transparent touch-target"
-              />
-            </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              {document?.is_public ? (
-                <>
-                  <Share2 className="h-3 w-3" />
-                  <span>Public</span>
-                </>
-              ) : (
-                <>
-                  <Lock className="h-3 w-3" />
-                  <span>Private</span>
-                </>
-              )}
-              
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-1 sm:gap-3">
-            <div className="hidden sm:flex items-center gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1"><FileIcon className="h-3 w-3" /> {blocks.length} blocks</span>
-                <span className="flex items-center gap-1"><Type className="h-3 w-3" /> {blocks.reduce((total, block) => total + (block.content?.split(/\s+/).length || 0), 0)} words</span>
-              </div>
-              <div>
-                {saving ? 'Saving...' : contentChanged ? 'Unsaved changes' : 'All changes saved'}
-              </div>
-            </div>
-            <div className="sm:hidden text-xs text-muted-foreground">
-              {saving ? 'Saving...' : contentChanged ? 'Unsaved' : 'Saved'}
-            </div>
-            
-            {/* <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-8"
-              onClick={() => {
-                // Show keyboard shortcuts help
-                toast.info("Keyboard shortcuts: Enter = new block, / = commands, Ctrl+S = save");
-              }}
-              title="Keyboard shortcuts"
-            >
-              <Keyboard className="h-4 w-4" />
-            </Button>
-            
-            <ShareButton
-              documentId={finalDocumentId}
-              isPublic={document?.is_public}
-              shareChildren={document?.share_children}
-              previewToken={document?.preview_token}
-              documentType={document?.type || 'document'}
-              onSharingChange={(isPublic, shareChildren) => {
-                // Update local state if needed
-                console.log('Sharing changed:', { isPublic, shareChildren });
-              }}
-            /> */}
-            
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-8"
-              onClick={async () => {
-                try {
-                  await saveDocument({ title, blocks_content: blocks });
-                  setTitleChanged(false);
-                  setContentChanged(false);
-                  toast.success('Document saved!');
-                } catch (error) {
-                  console.error('Failed to save document:', error);
-                  toast.error('Failed to save document');
-                }
-              }}
-              disabled={!titleChanged && !contentChanged}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              Save
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Content editor */}
-      <div className="flex-1 mobile-safe-area lg:px-8 overflow-y-auto min-h-0 mobile-scroll">
-        <div className="max-w-4xl mx-auto py-4 sm:py-6 pb-20 mobile-safe-bottom">
-          {/* Document title */}
-          <div className="text-center mb-4 sm:mb-6">
-            <h1 className="text-responsive-2xl font-bold mb-2 sm:mb-3 text-white">
-              {title || 'Untitled Document'}
-            </h1>
-          </div>
+      {/* Content editor - no header since it's now in ConditionalLayout */}
+      <div className="flex-1 mobile-safe-area lg:px-8 overflow-y-auto mobile-scroll">
+        {/* Spacer div to account for sticky header */}
+        <div className="h-16 shrink-0"></div>
+        {/* Content container with proper spacing */}
+        <div className="max-w-4xl mx-auto py-6 pb-32 px-4 sm:px-6">
+          {/* Document title is now handled in the header - remove duplicate */}
           
           {/* Blocks */}
-          <div className="">
+          <div className=" relative min-h-screen">
             {blocks.length === 0 ? (
               <div className="text-center py-8 sm:py-12 text-gray-400">
                 <Sparkles className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-blue-400 mb-4" />
@@ -1483,18 +1461,58 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                     </div>
                   ))}
                 </div>
+                
+                {/* Add first block button for empty state */}
+                <div className="mt-8">
+                  <Button
+                    variant="default"
+                    onClick={() => {
+                      const newBlock: Block = { id: `block-${Date.now()}`, type: 'text' as BlockType, content: '', orderIndex: 0 };
+                      setBlocks([newBlock]);
+                      
+                      // Save the new block to the backend
+                      (async () => {
+                        try {
+                          setContentChanged(true);
+                          await saveDocument({ blocks_content: [newBlock] });
+                          setContentChanged(false);
+                        } catch (error) {
+                          console.error('Failed to save first block:', error);
+                          setContentChanged(true);
+                        }
+                      })();
+                      
+                      // Focus the new block
+                      setTimeout(() => {
+                        const blockElement = blockRefs.current[newBlock.id];
+                        if (blockElement) {
+                          blockElement.focus();
+                        }
+                      }, 100);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create your first block
+                  </Button>
+                </div>
               </div>
             ) : (
               <>
                 {blocks.map((block) => (
                   <div 
                     key={block.id} 
-                    className={`relative group py-1 px-3 rounded-lg transition-all duration-200 hover:bg-gray-800/30 ${
+                    className={`relative group py-2 px-3 rounded-lg transition-all duration-200 hover:bg-gray-800/30 scroll-mt-20 ${
                       draggedBlockId === block.id ? 'opacity-50' : ''
                     } ${
                       dragOverBlockId === block.id ? 'bg-blue-500/10 border-l-4 border-blue-500' : ''
+                    } ${
+                      selectedBlockId === block.id ? 'bg-blue-500/10 border-l-2 border-blue-500' : ''
                     }`}
                     data-type={block.type}
+                    onClick={() => setSelectedBlockId(block.id)}
+                    onMouseEnter={() => setHoveredBlockId(block.id)}
+                    onMouseLeave={() => setHoveredBlockId(null)}
                     onDragOver={(e) => handleDragOver(e, block.id)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, block.id)}
@@ -1513,210 +1531,69 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                     </div>
                     
                     {/* Block content with proper padding */}
-                    <div className="ml-12 mr-10 relative z-10">
+                    <div className="ml-12 relative z-10">
                       {renderBlock(block)}
                       
-
-                    </div>
-                    
-                    {/* Three dots menu - visible on hover */}
-                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20" data-block-menu>
-                      <button
-                        onClick={() => setOpenMenuBlockId(openMenuBlockId === block.id ? null : block.id)}
-                        className="p-2 rounded-md hover:bg-gray-700/50 text-gray-400 hover:text-white transition-colors"
-                        title="Block options"
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </button>
+                      {/* BlockControls component - always render */}
+                      <BlockControls
+                        block={block}
+                        isSelected={selectedBlockId === block.id}
+                        isHovered={hoveredBlockId === block.id}
+                        onBlockTypeChange={(blockId: string, newType: BlockType) => {
+                          handleBlockChange(blockId, block.content, newType);
+                          toast.success(`Changed to ${newType.replace('-', ' ')}`);
+                        }}
+                        onFormatChange={handleFormatChange}
+                        onDuplicate={handleDuplicateBlock}
+                        onDelete={handleDeleteBlock}
+                        onAddComment={handleAddComment}
+                        onDragStart={handleBlockControlsDragStart}
+                      />
                       
-                      {/* Dropdown menu */}
-                      {openMenuBlockId === block.id && (
-                        <div className="absolute right-0 top-full mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-30">
-                          <div className="p-2 border-b border-gray-700">
-                            <div className="text-xs text-gray-400 font-medium">Block Actions</div>
-                          </div>
-                          
-                          {/* Block type switcher */}
-                          <div className="p-2 border-b border-gray-700">
-                            <div className="text-xs text-gray-400 font-medium mb-2">Change Type</div>
-                            <div className="grid grid-cols-4 gap-1">
-                              {(['text', 'heading-1', 'heading-2', 'heading-3', 'bulleted-list', 'numbered-list', 'todo-list', 'quote', 'code-block', 'im', 'video', 'table'] as BlockType[]).map((type) => (
-                                <button
-                                  key={type}
-                                  onClick={() => {
-                                    handleBlockChange(block.id, block.content, type as BlockType);
-                                    setOpenMenuBlockId(null);
-                                    toast.success(`Changed to ${type.replace('-', ' ')}`);
-                                  }}
-                                  className={`p-2 rounded transition-colors flex items-center justify-center ${
-                                    block.type === type 
-                                      ? 'bg-blue-600 text-white' 
-                                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                                  }`}
-                                  title={type.replace('-', ' ')}
-                                >
-                                  {getBlockTypeIcon(type as BlockType, "h-5 w-5")}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          
-                          <button
-                            onClick={() => {
-                              const newBlock: Block = { id: `block-${Date.now()}`, type: 'text' as BlockType, content: '' };
-                              setBlocks(prev => {
-                                const index = prev.findIndex(b => b.id === block.id);
-                                const newBlocks = [...prev];
-                                newBlocks.splice(index + 1, 0, newBlock);
-                                
-                                // Update order indices for all blocks
-                                const updatedBlocks = newBlocks.map((block, idx) => ({
-                                  ...block,
-                                  orderIndex: idx
-                                }));
-                                
-                                const finalBlocks = updateListIndices(updatedBlocks);
-                                
-                                // Save the updated blocks to the backend
-                                (async () => {
-                                  try {
-                                    setContentChanged(true);
-                                    await saveDocument({ blocks_content: finalBlocks });
-                                    setContentChanged(false);
-                                  } catch (error) {
-                                    console.error('Failed to save after adding block:', error);
-                                    setContentChanged(true);
-                                  }
-                                })();
-                                
-                                return finalBlocks;
-                              });
-                              setOpenMenuBlockId(null);
-                              toast.success("New block added");
-                            }}
-                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add below
-                          </button>
-                          
-                          <button
-                            onClick={() => {
-                              const newBlock: Block = { id: `block-${Date.now()}`, type: block.type, content: '' };
-                              setBlocks(prev => {
-                                const index = prev.findIndex(b => b.id === block.id);
-                                const newBlocks = [...prev];
-                                newBlocks.splice(index + 1, 0, newBlock);
-                                
-                                // Update order indices for all blocks
-                                const updatedBlocks = newBlocks.map((block, idx) => ({
-                                  ...block,
-                                  orderIndex: idx
-                                }));
-                                
-                                const finalBlocks = updateListIndices(updatedBlocks);
-                                
-                                // Save the updated blocks to the backend
-                                (async () => {
-                                  try {
-                                    setContentChanged(true);
-                                    await saveDocument({ blocks_content: finalBlocks });
-                                    setContentChanged(false);
-                                  } catch (error) {
-                                    console.error('Failed to save after block duplication:', error);
-                                    setContentChanged(true);
-                                  }
-                                })();
-                                
-                                return finalBlocks;
-                              });
-                              setOpenMenuBlockId(null);
-                              toast.success("Block duplicated");
-                            }}
-                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex"
-                          >
-                            <Copy className="h-4 w-4 mr-2" />
-                            Duplicate block
-                          </button>
-                          
-                          <button
-                            onClick={() => {
-                              if (blocks.length > 1) {
-                                setBlocks(prev => {
-                                  const filteredBlocks = prev.filter(b => b.id !== block.id);
-                                  
-                                  // Update order indices for remaining blocks
-                                  const updatedBlocks = filteredBlocks.map((block, idx) => ({
-                                    ...block,
-                                    orderIndex: idx
-                                  }));
-                                  
-                                  const finalBlocks = updateListIndices(updatedBlocks);
-                                  
-                                  // Save the updated blocks to the backend
-                                  (async () => {
-                                    try {
-                                      setContentChanged(true);
-                                      await saveDocument({ blocks_content: finalBlocks });
-                                      setContentChanged(false);
-                                    } catch (error) {
-                                      console.error('Failed to save after block deletion:', error);
-                                      setContentChanged(true);
-                                    }
-                                  })();
-                                  
-                                  return finalBlocks;
-                                });
-                                toast.success("Block deleted");
-                              } else {
-                                toast.error("Cannot delete the last block");
-                              }
-                              setOpenMenuBlockId(null);
-                            }}
-                            disabled={blocks.length <= 1}
-                            className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-gray-700 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-t border-gray-700 flex"
-                          >
-                            <Trash className="h-4 w-4 mr-2" />
-                            Delete block
-                          </button>
-                        </div>
+                      {/* FloatingToolbar for text selection - only for selected block */}
+                      {selectedBlockId === block.id && (
+                        <FloatingToolbar
+                          block={block}
+                          onFormatChange={handleFormatChange}
+                        />
                       )}
                     </div>
                   </div>
                 ))}
+                
+                {/* Add new block button - Inline at the end of blocks */}
+                <div className="mt-6 pt-4 border-t border-gray-800/50">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      if (blocks.length > 0) {
+                        addBlock(blocks[blocks.length - 1]?.id || '', false);
+                      } else {
+                        // If no blocks exist, create the first block
+                        const newBlock: Block = { id: `block-${Date.now()}`, type: 'text' as BlockType, content: '', orderIndex: 0 };
+                        setBlocks([newBlock]);
+                        
+                        // Save the new block to the backend
+                        (async () => {
+                          try {
+                            setContentChanged(true);
+                            await saveDocument({ blocks_content: [newBlock] });
+                            setContentChanged(false);
+                          } catch (error) {
+                            console.error('Failed to save first block:', error);
+                            setContentChanged(true);
+                          }
+                        })();
+                      }
+                    }}
+                    className="w-full text-gray-400 hover:text-white bg-gray-800/50 hover:bg-gray-700/70 border border-gray-600/30 hover:border-gray-500 transition-all duration-200 py-3 rounded-lg"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add new block
+                  </Button>
+                </div>
               </>
             )}
-          </div>
-            
-           {/* Add new block button */}
-           <div className="mt-6 text-center">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                if (blocks.length > 0) {
-                  addBlock(blocks[blocks.length - 1]?.id || '', false);
-                } else {
-                  // If no blocks exist, create the first block
-                  const newBlock: Block = { id: `block-${Date.now()}`, type: 'text' as BlockType, content: '', orderIndex: 0 };
-                  setBlocks([newBlock]);
-                  
-                  // Save the new block to the backend
-                  (async () => {
-                    try {
-                      setContentChanged(true);
-                      await saveDocument({ blocks_content: [newBlock] });
-                      setContentChanged(false);
-                    } catch (error) {
-                      console.error('Failed to save first block:', error);
-                      setContentChanged(true);
-                    }
-                  })();
-                }
-              }}
-              className="text-gray-400 hover:text-white"
-            >
-              + Add new block
-            </Button>
           </div>
         </div>
       </div>
@@ -1725,7 +1602,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       {showCommands && (
         <div 
           ref={commandPaletteRef}
-          className="fixed z-50 w-96 max-w-[90vw] bg-gray-800 border border-gray-700 rounded-lg shadow-xl backdrop-blur-sm"
+          className="fixed z-[110] w-96 max-w-[90vw] bg-gray-800 border border-gray-700 rounded-lg shadow-xl backdrop-blur-sm"
           style={{
             top: '50%',
             left: '50%',
