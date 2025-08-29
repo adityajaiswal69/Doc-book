@@ -61,14 +61,14 @@ export default function FloatingToolbar({ block, onFormatChange }: FloatingToolb
       }
     };
 
-    const handleMouseUp = (e: MouseEvent) => {
+    const handleMouseUp = () => {
       // Delay to allow selection to complete
       setTimeout(() => {
         handleSelectionChange();
       }, 100);
     };
 
-    const handleKeyUp = (e: KeyboardEvent) => {
+    const handleKeyUp = () => {
       // Handle keyboard selection
       setTimeout(() => {
         handleSelectionChange();

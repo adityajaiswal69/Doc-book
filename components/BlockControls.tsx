@@ -2,7 +2,6 @@
 
 import React from "react";
 import { 
-  GripVertical, 
   MoreHorizontal,
   Copy,
   MessageSquare,
@@ -24,25 +23,19 @@ import { Block, BlockType } from "@/types/editor";
 interface BlockControlsProps {
   block: Block;
   isSelected: boolean;
-  isHovered?: boolean;
   onBlockTypeChange: (blockId: string, newType: BlockType) => void;
-  onFormatChange: (blockId: string, format: string, value: unknown) => void;
   onDuplicate: (blockId: string) => void;
   onDelete: (blockId: string) => void;
   onAddComment: (blockId: string) => void;
-  onDragStart: (e: React.DragEvent, block: Block) => void;
 }
 
 export default function BlockControls({
   block,
   isSelected,
-  isHovered = false,
   onBlockTypeChange,
-  onFormatChange,
   onDuplicate,
   onDelete,
-  onAddComment,
-  onDragStart
+  onAddComment
 }: BlockControlsProps) {
 
   const blockTypeOptions = [

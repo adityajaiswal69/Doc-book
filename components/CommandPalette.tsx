@@ -190,12 +190,12 @@ export default function CommandPalette({
       id: "image",
       title: "Image",
       description: "Insert an image",
-      icon: <Image className="h-4 w-4" />,
+      icon: <Image className="h-4 w-4" aria-label="Image icon" />,
       shortcut: "!",
       category: "Media & Content",
       preview: (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
-          <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+          <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" aria-label="Image preview" />
           <div className="text-gray-400 text-sm">Image block</div>
         </div>
       ),

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useDocument } from "@/hooks/use-documents";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useState, useEffect, useRef } from "react";
+import { Block } from "@/types/editor";
 
 // Component for document header when in document routes
 function DocumentHeader({ documentId }: { documentId: string }) {
@@ -60,7 +61,7 @@ function DocumentHeader({ documentId }: { documentId: string }) {
         ? document.blocks_content 
         : JSON.parse(document.blocks_content || '[]');
       
-      const words = blocks.reduce((total: number, block: any) => 
+      const words = blocks.reduce((total: number, block: Block) => 
         total + (block.content?.split(/\s+/).length || 0), 0
       );
       

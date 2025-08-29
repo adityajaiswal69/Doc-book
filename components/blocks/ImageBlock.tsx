@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import NextImage from 'next/image';
 import { Image, Upload, Link, X, Loader2, AlertCircle, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -240,9 +241,11 @@ export default function ImageBlock({
                         minWidth: '150px'
                       }}
           >
-            <img 
+            <NextImage 
               src={block.metadata?.url || ''} 
               alt={caption || 'Image'} 
+              width={800}
+              height={600}
               className="w-full h-auto max-h-64 sm:max-h-96 rounded-lg shadow-sm object-contain"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
@@ -349,7 +352,7 @@ export default function ImageBlock({
       ) : (
         /* Empty State - Upload Options */
         <div className="flex flex-col items-center justify-center py-6 sm:py-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
-          <Image className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mb-3 sm:mb-4" />
+          <Image className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mb-3 sm:mb-4" aria-label="Upload image icon" />
           <div className="text-center space-y-3">
             <h3 className="text-base sm:text-lg font-medium text-gray-900">Add an image</h3>
             <p className="text-sm text-gray-500 px-4">Upload, embed with a link, or add from gallery</p>

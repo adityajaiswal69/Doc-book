@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Block } from "@/types/editor";
 
 interface PreviewBlockRendererProps {
@@ -179,9 +180,11 @@ export default function PreviewBlockRenderer({ block }: PreviewBlockRendererProp
                   minWidth: '200px'
                 }}
               >
-                <img
+                <Image
                   src={imageUrl}
                   alt={imageCaption || block.content || 'Image'}
+                  width={800}
+                  height={600}
                   className="w-full h-auto max-h-96 rounded-lg shadow-lg object-contain"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;

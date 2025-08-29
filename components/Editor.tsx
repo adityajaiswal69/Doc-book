@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Save, Lock, FileText, Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, AlertTriangle, Wrench, FileIcon, Sparkles, Camera, Film, BarChart3, Link, Plus, Copy, Trash, Heading3, Heading2, Heading1, Share2, ListOrdered } from "lucide-react";
+import { Search, Code, Hash, List, Type, Quote, CheckSquare, Minus, Table, Image, Video, AlertTriangle, Wrench, FileIcon, Sparkles, Camera, Film, BarChart3, Link, Plus, Heading3, Heading2, Heading1, ListOrdered } from "lucide-react";
 import ImageBlock from "@/components/blocks/ImageBlock";
 import VideoBlock from "@/components/blocks/VideoBlock";
 import BlockControls from "@/components/BlockControls";
@@ -29,8 +29,9 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
   const idFromParams = params.id as string;
   const finalDocumentId = documentId || idFromParams;
   const { user } = useAuth();
-  const { document, loading, error, saving, saveDocument } = useDocument(finalDocumentId);
+  const { document, loading, error, saveDocument } = useDocument(finalDocumentId);
   
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // Debug logging
   console.log('Editor render:', { finalDocumentId, user: user?.id, document: !!document, loading, error });
   
@@ -45,7 +46,6 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
   
   // Block selection state for controls
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
   
   // Drag and drop state
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
@@ -83,7 +83,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       case 'code-block':
         return <Code className={size} />;
       case 'im':
-        return <Image className={size} />;
+        return <Image className={size} aria-label="Image block icon" />;
       case 'video':
         return <Video className={size} />;
       case 'table':
@@ -281,11 +281,11 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
       id: "im",
       title: "Uploadable Image",
       description: "Upload image or add external URL",
-      icon: <Image className="h-4 w-4" />,
+      icon: <Image className="h-4 w-4" aria-label="Image icon" />,
       category: "Media & Content",
       preview: (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-center">
-          <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+          <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" aria-label="Image preview" />
           <div className="text-gray-400 text-sm">Upload or URL</div>
         </div>
       ),
@@ -946,12 +946,6 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
   }, [blocks, addBlock, updateListIndices, saveDocument]);
 
   // Block controls handler functions
-  const handleBlockTypeChange = useCallback((blockId: string, newType: BlockType) => {
-    setBlocks(prev => prev.map(block => 
-      block.id === blockId ? { ...block, type: newType } : block
-    ));
-    setContentChanged(true);
-  }, []);
 
   const handleFormatChange = useCallback((blockId: string, format: string, value: unknown) => {
     setBlocks(prev => prev.map(block => 
@@ -1038,10 +1032,7 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
     console.log('Add comment to block:', blockId);
   }, []);
 
-  const handleBlockControlsDragStart = useCallback((e: React.DragEvent, block: Block) => {
-    setDraggedBlockId(block.id);
-    e.dataTransfer.setData('text/plain', block.id);
-  }, []);
+
 
   // Render block based on type
   const renderBlock = (block: Block) => {
@@ -1330,102 +1321,105 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
     }
   };
 
-  // Show skeleton only on initial load when no document exists
-  if (loading && !document) {
-    return (
-      <div className="flex flex-col h-full">
-        {/* Header Skeleton */}
-        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-2">
+  // Conditional rendering content based on state - NO EARLY RETURNS
+  const renderContent = () => {
+    // Show skeleton only on initial load when no document exists
+    if (loading && !document) {
+      return (
+        <div className="flex flex-col h-full">
+          {/* Header Skeleton */}
+          <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex items-center justify-between px-4 py-3">
               <div className="flex items-center gap-2">
-                <div className="h-5 w-5 bg-gray-300 rounded animate-pulse" />
-                <div className="h-6 w-48 bg-gray-300 rounded animate-pulse" />
+                <div className="flex items-center gap-2">
+                  <div className="h-5 w-5 bg-gray-300 rounded animate-pulse" />
+                  <div className="h-6 w-48 bg-gray-300 rounded animate-pulse" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="h-3 w-3 bg-gray-300 rounded animate-pulse" />
+                  <div className="h-3 w-16 bg-gray-300 rounded animate-pulse" />
+                  <div className="h-4 w-4 bg-gray-300 rounded animate-pulse" />
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <div className="h-3 w-3 bg-gray-300 rounded animate-pulse" />
-                <div className="h-3 w-16 bg-gray-300 rounded animate-pulse" />
-                <div className="h-4 w-4 bg-gray-300 rounded animate-pulse" />
-              </div>
+              <div className="h-3 w-24 bg-gray-300 rounded animate-pulse" />
             </div>
-            <div className="h-3 w-24 bg-gray-300 rounded animate-pulse" />
+          </div>
+
+          {/* Content Skeleton */}
+          <div className="flex-1 p-6 space-y-4">
+            {/* Title skeleton */}
+            <div className="h-8 w-64 bg-gray-300 rounded animate-pulse" />
+            
+            {/* Content blocks skeleton */}
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="space-y-2">
+                <div className="h-4 w-full bg-gray-300 rounded animate-pulse" />
+                {i === 0 && <div className="h-4 w-3/4 bg-gray-300 rounded animate-pulse" />}
+              </div>
+            ))}
           </div>
         </div>
+      );
+    }
 
-        {/* Content Skeleton */}
-        <div className="flex-1 p-6 space-y-4">
-          {/* Title skeleton */}
-          <div className="h-8 w-64 bg-gray-300 rounded animate-pulse" />
-          
-          {/* Content blocks skeleton */}
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="space-y-2">
-              <div className="h-4 w-full bg-gray-300 rounded animate-pulse" />
-              {i === 0 && <div className="h-4 w-3/4 bg-gray-300 rounded animate-pulse" />}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <AlertTriangle className="h-8 w-8 text-red-500 mx-auto" />
-              <h3 className="text-lg font-semibold">Error Loading Document</h3>
-              <p className="text-sm text-muted-foreground">{error}</p>
-              
-              {/* Show repair access option for access denied errors */}
-              {error.includes("Access denied") && (
-                <div className="pt-4 border-t">
-                  <p className="text-sm text-muted-foreground mb-3">
-                    This might be a permissions issue. You can try to repair your access:
-                  </p>
-                  <Button 
-                    onClick={async () => {
-                      try {
-                        const { repairUserDocumentAccess } = await import('@/actions/actions');
-                        if (user?.id) {
-                          const result = await repairUserDocumentAccess(user.id, finalDocumentId);
-                          toast.success(`Access repair result: ${result.message}`);
-                          // Refresh the document
-                          window.location.reload();
+    if (error) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <Card className="w-full max-w-md">
+            <CardContent className="pt-6">
+              <div className="text-center space-y-4">
+                <AlertTriangle className="h-8 w-8 text-red-500 mx-auto" />
+                <h3 className="text-lg font-semibold">Error Loading Document</h3>
+                <p className="text-sm text-muted-foreground">{error}</p>
+                
+                {/* Show repair access option for access denied errors */}
+                {error.includes("Access denied") && (
+                  <div className="pt-4 border-t">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      This might be a permissions issue. You can try to repair your access:
+                    </p>
+                    <Button 
+                      onClick={async () => {
+                        try {
+                          const { repairUserDocumentAccess } = await import('@/actions/actions');
+                          if (user?.id) {
+                            const result = await repairUserDocumentAccess(user.id, finalDocumentId);
+                            toast.success(`Access repair result: ${result.message}`);
+                            // Refresh the document
+                            window.location.reload();
+                          }
+                        } catch (repairError) {
+                          toast.error(`Failed to repair access: ${repairError instanceof Error ? repairError.message : 'Unknown error'}`);
                         }
-                      } catch (repairError) {
-                        toast.error(`Failed to repair access: ${repairError instanceof Error ? repairError.message : 'Unknown error'}`);
-                      }
-                    }}
-                    className="w-full"
-                  >
-                    <Wrench className="h-4 w-4 mr-2" />
-                    Repair Access
-                  </Button>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!document) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center space-y-4">
-          <FileIcon className="h-8 w-8 text-muted-foreground mx-auto" />
-          <h3 className="text-lg font-semibold">Document Not Found</h3>
-          <p className="text-sm text-muted-foreground">The document you&apos;re looking for doesn&apos;t exist.</p>
+                      }}
+                      className="w-full"
+                    >
+                      <Wrench className="h-4 w-4 mr-2" />
+                      Repair Access
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  return (
+    if (!document) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center space-y-4">
+            <FileIcon className="h-8 w-8 text-muted-foreground mx-auto" />
+            <h3 className="text-lg font-semibold">Document Not Found</h3>
+            <p className="text-sm text-muted-foreground">The document you&apos;re looking for doesn&apos;t exist.</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Main editor content
+    return (
     <div className="flex flex-col h-full relative mobile-keyboard-safe">
       {/* Content editor - no header since it's now in ConditionalLayout */}
       <div className="flex-1 mobile-safe-area lg:px-8 overflow-y-auto mobile-scroll">
@@ -1511,8 +1505,6 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                     }`}
                     data-type={block.type}
                     onClick={() => setSelectedBlockId(block.id)}
-                    onMouseEnter={() => setHoveredBlockId(block.id)}
-                    onMouseLeave={() => setHoveredBlockId(null)}
                     onDragOver={(e) => handleDragOver(e, block.id)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, block.id)}
@@ -1538,16 +1530,13 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
                       <BlockControls
                         block={block}
                         isSelected={selectedBlockId === block.id}
-                        isHovered={hoveredBlockId === block.id}
                         onBlockTypeChange={(blockId: string, newType: BlockType) => {
                           handleBlockChange(blockId, block.content, newType);
                           toast.success(`Changed to ${newType.replace('-', ' ')}`);
                         }}
-                        onFormatChange={handleFormatChange}
                         onDuplicate={handleDuplicateBlock}
                         onDelete={handleDeleteBlock}
                         onAddComment={handleAddComment}
-                        onDragStart={handleBlockControlsDragStart}
                       />
                       
                       {/* FloatingToolbar for text selection - only for selected block */}
@@ -1763,5 +1752,9 @@ export default function Editor({ documentId }: { documentId?: string } = {}) {
         </div>
       )}
     </div>
-  );
+    );
+  };
+
+  // Main component return - always call renderContent() to avoid early returns
+  return renderContent();
 }

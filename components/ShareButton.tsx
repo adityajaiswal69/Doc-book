@@ -69,8 +69,8 @@ export default function ShareButton({
     const handleClickOutside = (e: MouseEvent) => {
       if (showShareDialog) {
         const target = e.target as Element;
-        // Check if click is outside the dialog
-        if (!target.closest('[data-share-dialog]')) {
+        // Check if click is outside the dialog (improved detection)
+        if (!target.closest('[data-share-dialog]') && !target.closest('.share-dialog-content')) {
           setShowShareDialog(false);
         }
       }
@@ -202,28 +202,28 @@ export default function ShareButton({
         <>
           {/* Backdrop for mobile/overlay */}
           <div 
-            className="fixed inset-0 bg-black/20 z-[9998] md:hidden"
+            className="fixed inset-0 bg-black/20 z-[100] sm:hidden" 
             onClick={() => setShowShareDialog(false)}
           />
           
           {/* Dropdown positioned below button */}
-          <div className="absolute top-full right-0 mt-2 z-[9999] w-96 sm:w-[28rem] max-w-[95vw] sm:left-auto sm:right-0">
+          <div className="absolute top-full right-0 mt-2 z-[101] w-80 sm:w-96 max-w-[calc(100vw-2rem)] sm:max-w-[28rem] share-dialog-content">
             {/* Arrow pointing up */}
-            <div className="absolute -top-2 right-4 w-4 h-4 bg-background border-l-2 border-t-2 border-border rotate-45 transform"></div>
-            <Card className="w-full animate-in fade-in-0 zoom-in-95 duration-200 shadow-2xl border-2 bg-background overflow-visible min-h-fit">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-semibold">Public sharing</CardTitle>
+            <div className="absolute -top-1 right-6 w-3 h-3 bg-background border-l border-t border-border rotate-45 transform z-[102]"></div>
+            <Card className="w-full animate-in fade-in-0 zoom-in-95 duration-200 shadow-lg border bg-background/95 backdrop-blur-sm overflow-hidden relative">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 pt-4">
+              <CardTitle className="text-base font-semibold">Public sharing</CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowShareDialog(false)}
-                className="h-8 w-8 p-0"
+                className="h-7 w-7 p-0 hover:bg-accent"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </Button>
             </CardHeader>
             
-            <CardContent className="space-y-4 p-4">
+            <CardContent className="space-y-4 px-4 pb-4">
               {/* Document Info */}
               <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
                 {documentType === 'folder' ? (
@@ -277,33 +277,38 @@ export default function ShareButton({
               {isPublicState && shareUrl && (
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Share link</Label>
-                  <div className="flex gap-2 w-full">
+                  <div className="flex gap-1.5 w-full">
                     <Input
                       value={shareUrl}
                       readOnly
-                      className="text-xs flex-1 min-w-0 break-all"
+                      className="text-xs flex-1 min-w-0 font-mono bg-muted/50 cursor-pointer hover:bg-muted"
                       onClick={(e) => {
                         e.currentTarget.select();
                         copyShareLink();
                       }}
+                      title="Click to copy"
                     />
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={copyShareLink}
-                      className={`px-3 flex-shrink-0 ${copied ? 'bg-green-100 text-green-700 border-green-300' : ''}`}
+                      className={`px-2.5 flex-shrink-0 transition-all ${
+                        copied 
+                          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' 
+                          : 'hover:bg-accent'
+                      }`}
                       title={copied ? "Copied!" : "Copy link"}
                     >
-                      <Copy className="h-4 w-4" />
+                      <Copy className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={openShareLink}
-                      className="px-3 flex-shrink-0"
+                      className="px-2.5 flex-shrink-0 hover:bg-accent"
                       title="Open in new tab"
                     >
-                      <ExternalLink className="h-4 w-4" />
+                      <ExternalLink className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>

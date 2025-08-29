@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -43,6 +43,8 @@ export default function SidebarShareButton({
   const [shareChildrenState, setShareChildrenState] = useState(shareChildren);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const { user } = useAuth();
 
   // Reset dialog state on component mount to prevent persistence after reload
@@ -180,12 +182,24 @@ export default function SidebarShareButton({
 
   const shareUrl = previewToken ? `${window.location.origin}/preview/${previewToken}` : '';
 
+  const handleButtonClick = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setButtonPosition({
+        top: rect.top,
+        left: rect.left
+      });
+    }
+    setShowShareDialog(true);
+  };
+
   return (
     <div className="relative inline-block" data-sidebar-share-dialog>
       <Button
+        ref={buttonRef}
         variant="ghost"
         size="sm"
-        onClick={() => setShowShareDialog(true)}
+        onClick={handleButtonClick}
         className="h-6 w-6 p-0 hover:bg-accent"
         title="Share document"
       >
@@ -196,12 +210,19 @@ export default function SidebarShareButton({
         <>
           {/* Backdrop for mobile/overlay */}
           <div 
-            className="fixed inset-0 bg-black/20 z-[9998] md:hidden"
+            className="fixed inset-0 bg-black/20 z-[99998] md:hidden"
             onClick={() => setShowShareDialog(false)}
           />
           
           {/* Sidebar-specific positioned dialog */}
-          <div className="absolute left-full top-0 ml-2 z-[9999] w-96 max-w-[calc(100vw-320px)]">
+          <div 
+            className="fixed z-[99999] w-96 max-w-[calc(100vw-var(--sidebar-width)-2rem)] md:max-w-96"
+            style={{
+              left: 'calc(var(--sidebar-width) + 0.5rem)',
+              top: `${Math.max(buttonPosition.top - 16, 16)}px`,
+              right: 'auto'
+            }}
+          >
             {/* Arrow pointing left */}
             <div className="absolute left-0 top-4 transform -translate-x-2 w-4 h-4 bg-background border-l-2 border-b-2 border-border rotate-45"></div>
             

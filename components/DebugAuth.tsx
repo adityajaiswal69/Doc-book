@@ -5,15 +5,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { testDatabaseConnection } from "@/actions/actions";
 import { useState } from "react";
+import { UserRoom } from "@/types/database";
+
+interface TestResult {
+  userRooms?: UserRoom[] | null;
+  error?: {
+    message: string;
+    details?: string;
+    hint?: string;
+    code?: string;
+  } | null;
+}
 
 export default function DebugAuth() {
   const { user, session, loading } = useAuth();
-  const [testResult, setTestResult] = useState<any>(null);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [testing, setTesting] = useState(false);
 
   const handleTestConnection = async () => {
     if (!user?.id) {
-      setTestResult({ error: 'No user ID available' });
+      setTestResult({ error: { message: 'No user ID available' } });
       return;
     }
 
@@ -22,7 +33,7 @@ export default function DebugAuth() {
       const result = await testDatabaseConnection(user.id);
       setTestResult(result);
     } catch (error) {
-      setTestResult({ error: error instanceof Error ? error.message : 'Unknown error' });
+      setTestResult({ error: { message: error instanceof Error ? error.message : 'Unknown error' } });
     } finally {
       setTesting(false);
     }

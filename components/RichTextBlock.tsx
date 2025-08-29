@@ -1,10 +1,20 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Block, BlockType, Selection } from "@/types/editor";
+import { Block } from "@/types/editor";
+
+// Define the missing types locally since they're not in the main types file
+interface Selection {
+  blockId: string;
+  start: number;
+  end: number;
+}
+
+// For now, treat RichBlock as the same as Block since that's what's being passed
+type RichBlock = Block;
 
 interface RichTextBlockProps {
-  block: Block;
+  block: RichBlock;
   isSelected: boolean;
   onContentChange: (blockId: string, content: string) => void;
   onSelectionChange: (selection: Selection | null) => void;
@@ -165,7 +175,7 @@ export default function RichTextBlock({
     if (block.content !== lastContent && !isEditing) {
       setLastContent(block.content);
       if (contentRef.current) {
-        contentRef.current.innerHTML = applyFormatting(block.content, block.metadata);
+        contentRef.current.innerHTML = applyFormatting(block.content, block.metadata || {});
       }
     }
   }, [block.content, block.metadata, lastContent, isEditing, applyFormatting]);
@@ -173,7 +183,7 @@ export default function RichTextBlock({
   // Apply formatting when metadata changes
   useEffect(() => {
     if (contentRef.current && !isEditing) {
-      contentRef.current.innerHTML = applyFormatting(block.content, block.metadata);
+      contentRef.current.innerHTML = applyFormatting(block.content, block.metadata || {});
     }
   }, [block.metadata, block.content, isEditing, applyFormatting]);
 
@@ -197,22 +207,22 @@ export default function RichTextBlock({
 
     // Apply block type specific styles
     switch (block.type) {
-      case BlockType.HEADING_1:
+      case 'heading-1':
         baseStyles.fontSize = '32px';
         baseStyles.fontWeight = 'bold';
         baseStyles.lineHeight = '1.2';
         break;
-      case BlockType.HEADING_2:
+      case 'heading-2':
         baseStyles.fontSize = '24px';
         baseStyles.fontWeight = '600';
         baseStyles.lineHeight = '1.3';
         break;
-      case BlockType.HEADING_3:
+      case 'heading-3':
         baseStyles.fontSize = '20px';
         baseStyles.fontWeight = '500';
         baseStyles.lineHeight = '1.4';
         break;
-      case BlockType.CODE_BLOCK:
+      case 'code-block':
         baseStyles.fontFamily = 'monospace';
         baseStyles.backgroundColor = 'rgba(31, 41, 55, 0.8)';
         baseStyles.color = '#10b981';
@@ -220,13 +230,13 @@ export default function RichTextBlock({
         baseStyles.borderRadius = '6px';
         baseStyles.border = '1px solid rgba(75, 85, 99, 0.5)';
         break;
-      case BlockType.QUOTE:
+      case 'quote':
         baseStyles.fontStyle = 'italic';
         baseStyles.borderLeft = '4px solid #6b7280';
         baseStyles.paddingLeft = '12px';
         baseStyles.color = '#d1d5db';
         break;
-      case BlockType.DIVIDER:
+      case 'divider':
         baseStyles.borderTop = '1px solid #6b7280';
         baseStyles.margin = '16px 0';
         baseStyles.minHeight = '1px';
@@ -234,23 +244,23 @@ export default function RichTextBlock({
     }
 
     // Apply metadata-based styles
-    if (block.metadata.textAlign) {
+    if (block.metadata?.textAlign) {
       baseStyles.textAlign = block.metadata.textAlign;
     }
 
-    if (block.metadata.color) {
+    if (block.metadata?.color) {
       baseStyles.color = block.metadata.color;
     }
 
-    if (block.metadata.backgroundColor) {
+    if (block.metadata?.backgroundColor) {
       baseStyles.backgroundColor = block.metadata.backgroundColor;
     }
 
-    if (block.metadata.fontSize) {
+    if (block.metadata?.fontSize) {
       baseStyles.fontSize = `${block.metadata.fontSize}px`;
     }
 
-    if (block.metadata.fontWeight) {
+    if (block.metadata?.fontWeight) {
       baseStyles.fontWeight = block.metadata.fontWeight;
     }
 
@@ -260,36 +270,27 @@ export default function RichTextBlock({
   // Get placeholder text
   const getPlaceholder = useCallback(() => {
     switch (block.type) {
-      case BlockType.HEADING_1:
+      case 'heading-1':
         return 'Heading 1';
-      case BlockType.HEADING_2:
+      case 'heading-2':
         return 'Heading 2';
-      case BlockType.HEADING_3:
+      case 'heading-3':
         return 'Heading 3';
-      case BlockType.BULLETED_LIST:
+      case 'bulleted-list':
         return 'List item';
-      case BlockType.NUMBERED_LIST:
+      case 'numbered-list':
         return 'List item';
-      case BlockType.TODO_LIST:
+      case 'todo-list':
         return 'Task item';
-      case BlockType.QUOTE:
+      case 'quote':
         return 'Quote text';
-      case BlockType.CODE_BLOCK:
+      case 'code-block':
         return '// Your code here';
-      case BlockType.IMAGE:
+      case 'image':
+      case 'im':
         return 'Image description or URL';
-      case BlockType.VIDEO:
+      case 'video':
         return 'Video description or URL';
-      case BlockType.BOOKMARK:
-        return 'Bookmark URL';
-      case BlockType.CALLOUT:
-        return 'Callout text';
-      case BlockType.MENTION:
-        return '@username';
-      case BlockType.PAGE_REFERENCE:
-        return 'Page title or ID';
-      case BlockType.DATABASE_REFERENCE:
-        return 'Database name or ID';
       default:
         return placeholder;
     }
@@ -327,9 +328,9 @@ export default function RichTextBlock({
       className={`
         rich-text-block
         ${isSelected ? 'ring-1 ring-blue-500 ring-opacity-50' : ''}
-        ${block.type === BlockType.CODE_BLOCK ? 'font-mono' : ''}
-        ${block.type === BlockType.QUOTE ? 'italic' : ''}
-        ${block.type === BlockType.DIVIDER ? 'border-t border-gray-600 my-4' : ''}
+        ${block.type === 'code-block' ? 'font-mono' : ''}
+        ${block.type === 'quote' ? 'italic' : ''}
+        ${block.type === 'divider' ? 'border-t border-gray-600 my-4' : ''}
         transition-all duration-150
         focus:outline-none
         focus:ring-0
@@ -342,7 +343,7 @@ export default function RichTextBlock({
       data-block-type={block.type}
       data-placeholder={getPlaceholder()}
       dangerouslySetInnerHTML={{
-        __html: applyFormatting(block.content, block.metadata)
+        __html: applyFormatting(block.content, block.metadata || {})
       }}
     />
   );
