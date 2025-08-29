@@ -70,8 +70,8 @@ export default function SidebarShareButton({
     const handleClickOutside = (e: MouseEvent) => {
       if (showShareDialog) {
         const target = e.target as Element;
-        // Check if click is outside the dialog
-        if (!target.closest('[data-sidebar-share-dialog]')) {
+        // Check if click is outside the dialog - need to check both the button container and the portal dialog
+        if (!target.closest('[data-sidebar-share-dialog]') && !target.closest('[data-share-dialog-content]')) {
           setShowShareDialog(false);
         }
       }
@@ -223,6 +223,7 @@ export default function SidebarShareButton({
               top: `${Math.max(buttonPosition.top - 16, 16)}px`,
               right: 'auto'
             }}
+            data-share-dialog-content
           >
             {/* Arrow pointing left */}
             <div className="absolute left-0 top-4 transform -translate-x-2 w-4 h-4 bg-background border-l-2 border-b-2 border-border rotate-45"></div>
