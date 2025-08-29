@@ -10,10 +10,9 @@ import {
   ChevronDown,
   Eye,
   Copy,
-  ExternalLink,
-  Menu,
-  X
+  ExternalLink
 } from "lucide-react";
+
 import { toast } from "sonner";
 import PreviewBlockRenderer from "./PreviewBlockRenderer";
 
@@ -25,7 +24,6 @@ interface PreviewDocumentProps {
 export default function PreviewDocument({ mainDocument, childDocuments }: PreviewDocumentProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>(mainDocument?.id || '');
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   // Safety check for mainDocument
   if (!mainDocument) {
@@ -41,10 +39,17 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
 
 
 
-  // Get the currently selected document
-  const selectedDocument = selectedDocumentId === mainDocument.id 
+  // Get the currently selected document (only if it's a document, not a folder)
+  let selectedDocument = selectedDocumentId === mainDocument.id 
     ? mainDocument 
     : childDocuments.find(doc => doc.id === selectedDocumentId);
+  
+  // If selected item is a folder or not found, default to the first document
+  if (!selectedDocument || selectedDocument.type === 'folder') {
+    selectedDocument = mainDocument.type === 'document' 
+      ? mainDocument 
+      : childDocuments.find(doc => doc.type === 'document') || mainDocument;
+  }
 
   // Parse blocks for the selected document
   const selectedBlocks = selectedDocument?.blocks_content && Array.isArray(selectedDocument.blocks_content)
@@ -74,149 +79,164 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
     window.open(shareUrl, '_blank');
   };
 
-  const toggleMobileSidebar = () => {
-    setIsMobileSidebarOpen(!isMobileSidebarOpen);
-  };
-
   const selectDocument = (docId: string) => {
-    setSelectedDocumentId(docId);
-    setIsMobileSidebarOpen(false); // Close mobile sidebar when selecting a document
-  };
-
-  // Group child documents by parent (for folder structure)
-  const documentsByParent = childDocuments.reduce((acc, doc) => {
-    const parentId = doc.parent_id || 'root';
-    if (!acc[parentId]) {
-      acc[parentId] = [];
+    // Only allow selection of documents, not folders
+    const doc = docId === mainDocument.id 
+      ? mainDocument 
+      : childDocuments.find(d => d.id === docId);
+    
+    if (doc && doc.type === 'document') {
+      setSelectedDocumentId(docId);
     }
-    acc[parentId].push(doc);
-    return acc;
-  }, {} as Record<string, Document[]>);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const renderDocumentTree = (docs: Document[], parentId: string | null = null) => {
-    return docs
-      .filter(doc => doc.parent_id === parentId)
-      .sort((a, b) => a.order_index - b.order_index)
-      .map(doc => {
-        const isFolder = doc.type === 'folder';
-        const isExpanded = expandedFolders.has(doc.id);
-        const isSelected = selectedDocumentId === doc.id;
-        const hasChildren = documentsByParent[doc.id]?.length > 0;
-
-        return (
-          <div key={doc.id} className="w-full">
-            <div
-              className={`flex items-center space-x-2 px-2 py-1 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-              }`}
-              onClick={() => selectDocument(doc.id)}
-            >
-              {isFolder ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFolder(doc.id);
-                  }}
-                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                >
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </button>
-              ) : (
-                <div className="w-6" />
-              )}
-              
-              {isFolder ? (
-                <Folder className="h-4 w-4 text-blue-500" />
-              ) : (
-                <FileText className="h-4 w-4 text-gray-500" />
-              )}
-              
-              <span className="flex-1 text-sm truncate">{doc.title}</span>
-            </div>
-            
-            {isFolder && isExpanded && hasChildren && (
-              <div className="ml-6">
-                {renderDocumentTree(documentsByParent[doc.id] || [], doc.id)}
-              </div>
-            )}
-          </div>
-        );
-      });
   };
 
-  // Render all documents in a flat list for preview
-  const renderAllDocuments = () => {
+
+
+  // Define document with children type
+  type DocumentWithChildren = Document & { children: DocumentWithChildren[] };
+
+  // Build hierarchical document tree for sidebar
+  const buildDocumentTree = (): DocumentWithChildren[] => {
     const allDocs = [mainDocument, ...childDocuments];
-    return allDocs.map(doc => {
+    const docMap = new Map<string, DocumentWithChildren>();
+    
+    // First pass: create map with children arrays
+    allDocs.forEach(doc => {
+      docMap.set(doc.id, { ...doc, children: [] });
+    });
+
+    // Second pass: build tree structure
+    const roots: DocumentWithChildren[] = [];
+    allDocs.forEach(doc => {
+      const node = docMap.get(doc.id)!;
+      if (doc.parent_id && docMap.has(doc.parent_id)) {
+        const parent = docMap.get(doc.parent_id)!;
+        parent.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+
+    // Sort by order_index
+    const sortNodes = (nodes: DocumentWithChildren[]) => {
+      nodes.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+      nodes.forEach(node => {
+        if (node.children.length > 0) {
+          sortNodes(node.children);
+        }
+      });
+    };
+
+    sortNodes(roots);
+    return roots;
+  };
+
+  // Simple document tree renderer without nested buttons
+  const renderSimpleDocumentTree = (docs: DocumentWithChildren[]): React.ReactNode[] => {
+    return docs.map(doc => {
       const isFolder = doc.type === 'folder';
+      const isExpanded = expandedFolders.has(doc.id);
       const isSelected = selectedDocumentId === doc.id;
+      const hasChildren = doc.children.length > 0;
 
       return (
         <div key={doc.id} className="w-full">
-                      <div
-              className={`flex items-center space-x-2 px-2 py-2 sm:py-1 rounded cursor-pointer hover:bg-gray-800 active:bg-gray-700 transition-colors ${
-                isSelected ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''
-              }`}
-              onClick={() => selectDocument(doc.id)}
-            >
+          <div
+            className={`flex items-center space-x-2 px-2 py-2 sm:py-1 rounded transition-colors ${
+              isFolder 
+                ? 'cursor-default' 
+                : `cursor-pointer hover:bg-gray-800 active:bg-gray-700 ${
+                    isSelected ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''
+                  }`
+            }`}
+            onClick={() => !isFolder && selectDocument(doc.id)}
+          >
+            {/* Chevron for folders with children */}
+            {isFolder && hasChildren ? (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFolder(doc.id);
+                }}
+                className="p-1 hover:bg-gray-700 rounded cursor-pointer"
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                )}
+              </div>
+            ) : (
               <div className="w-6" />
-              
-              {isFolder ? (
-                <Folder className="h-4 w-4 text-blue-400 flex-shrink-0" />
-              ) : (
-                <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
-              )}
-              
-              <span className="flex-1 text-sm truncate text-white">{doc.title}</span>
+            )}
+            
+            {/* Icon */}
+            {isFolder ? (
+              <Folder className="h-4 w-4 text-blue-400 flex-shrink-0" />
+            ) : (
+              <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            )}
+            
+            {/* Title */}
+            <span className={`flex-1 text-sm truncate ${isFolder ? 'text-gray-300' : 'text-white'}`}>
+              {doc.title}
+            </span>
+          </div>
+          
+          {/* Render children if folder is expanded */}
+          {isFolder && isExpanded && hasChildren && (
+            <div className="ml-6 mt-1 space-y-1">
+              {doc.children.map(child => {
+                const childIsFolder = child.type === 'folder';
+                const childIsSelected = selectedDocumentId === child.id;
+                
+                return (
+                  <div
+                    key={child.id}
+                    className={`flex items-center space-x-2 px-2 py-1 rounded transition-colors ${
+                      childIsFolder 
+                        ? 'cursor-default' 
+                        : `cursor-pointer hover:bg-gray-800 ${
+                            childIsSelected ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''
+                          }`
+                    }`}
+                    onClick={() => !childIsFolder && selectDocument(child.id)}
+                  >
+                    <div className="w-6" />
+                    {childIsFolder ? (
+                      <Folder className="h-3 w-3 text-blue-400 flex-shrink-0" />
+                    ) : (
+                      <FileText className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                    )}
+                    <span className={`flex-1 text-xs truncate ${childIsFolder ? 'text-gray-300' : 'text-white'}`}>
+                      {child.title}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
+          )}
         </div>
       );
     });
   };
 
+  const treeData = buildDocumentTree();
+
   return (
     <div className="flex h-full bg-black text-white relative mobile-keyboard-safe mobile-vh-100">
-      {/* Mobile Overlay */}
-      {isMobileSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={toggleMobileSidebar}
-        />
-      )}
-      
       {/* Sidebar */}
-      <div className={`
-        w-64 border-r border-gray-800 bg-gray-900 flex flex-col
-        fixed lg:relative inset-y-0 left-0 z-50 
-        transform ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
-        lg:translate-x-0 transition-transform duration-200 ease-in-out
-      `}>
+      <div className="w-64 border-r border-gray-800 bg-gray-900 flex flex-col fixed lg:relative inset-y-0 left-0 z-50 lg:translate-x-0 transition-transform duration-200 ease-in-out">
         <div className="p-4 border-b border-gray-800">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center space-x-2">
-              <Eye className="h-4 w-4 text-blue-500" />
-              <h2 className="font-semibold text-sm text-white">Shared Documents</h2>
-            </div>
-            <button
-              onClick={toggleMobileSidebar}
-              className="lg:hidden p-1 hover:bg-gray-800 rounded"
-            >
-              <X className="h-4 w-4 text-gray-400" />
-            </button>
+          <div className="flex items-center space-x-2">
+            <Eye className="h-4 w-4 text-blue-400" />
+            <h2 className="font-semibold text-sm text-white">Documents</h2>
           </div>
-          <p className="text-xs text-gray-400">
-            {mainDocument.share_children ? 'Folder shared' : 'Document shared'}
-          </p>
         </div>
         
         <div className="flex-1 overflow-y-auto p-2">
           <div className="space-y-1">
-            {renderAllDocuments()}
+            {renderSimpleDocumentTree(treeData)}
           </div>
         </div>
         
@@ -246,49 +266,41 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-black lg:ml-0">
-        {/* Header - matching Editor.tsx style */}
-        <div className="border-b border-gray-800 bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-black/60 flex-shrink-0">
-          <div className="flex items-center justify-between px-3 lg:px-4 py-3">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              {/* Mobile menu button */}
-              <button
-                onClick={toggleMobileSidebar}
-                className="lg:hidden p-2 hover:bg-gray-800 rounded mr-2 flex-shrink-0 touch-target"
-              >
-                <Menu className="h-5 w-5 text-gray-400" />
-              </button>
-              
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col overflow-hidden bg-black">
+          {/* Header - matching Editor.tsx style */}
+          <div className="border-b border-gray-800 bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-black/60 flex-shrink-0">
+            <div className="flex items-center justify-between px-3 lg:px-4 py-3">
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <FileText className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                <h1 className="text-responsive-base font-semibold text-white truncate">
-                  {selectedDocument?.title || 'Untitled Document'}
-                </h1>
-              </div>
-              <div className="hidden sm:flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
-                <Eye className="h-3 w-3" />
-                <span>Preview Mode</span>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="hidden md:flex items-center gap-4 text-xs text-gray-400">
-                <div className="flex items-center gap-2">
-                  <span className="hidden lg:flex items-center gap-1">
-                    <FileText className="h-3 w-3" /> 
-                    {selectedBlocks.length} blocks
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <FileText className="h-3 w-3" /> 
-                    {selectedBlocks.reduce((total, block) => total + (block.content?.split(/\s+/).length || 0), 0)} words
-                  </span>
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <FileText className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                  <h1 className="text-responsive-base font-semibold text-white truncate">
+                    {selectedDocument?.title || 'Untitled Document'}
+                  </h1>
                 </div>
-                <div className="hidden lg:block">Read-only preview</div>
+                <div className="hidden sm:flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
+                  <Eye className="h-3 w-3" />
+                  <span>Preview Mode</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="hidden md:flex items-center gap-4 text-xs text-gray-400">
+                  <div className="flex items-center gap-2">
+                    <span className="hidden lg:flex items-center gap-1">
+                      <FileText className="h-3 w-3" /> 
+                      {selectedBlocks.length} blocks
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <FileText className="h-3 w-3" /> 
+                      {selectedBlocks.reduce((total, block) => total + (block.content?.split(/\s+/).length || 0), 0)} words
+                    </span>
+                  </div>
+                  <div className="hidden lg:block">Read-only preview</div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
         {/* Document Content - matching Editor.tsx layout */}
         <div className="flex-1 mobile-safe-area lg:px-8 overflow-y-auto min-h-0 bg-black mobile-scroll">
