@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -206,17 +207,17 @@ export default function SidebarShareButton({
         <Share2 className="h-3 w-3" />
       </Button>
 
-      {showShareDialog && (
+      {showShareDialog && typeof window !== 'undefined' && createPortal(
         <>
           {/* Backdrop for mobile/overlay */}
           <div 
-            className="fixed inset-0 bg-black/20 z-[99998] md:hidden"
+            className="fixed inset-0 bg-black/20 z-[9998] md:hidden"
             onClick={() => setShowShareDialog(false)}
           />
           
           {/* Sidebar-specific positioned dialog */}
           <div 
-            className="fixed z-[99999] w-96 max-w-[calc(100vw-var(--sidebar-width)-2rem)] md:max-w-96"
+            className="fixed z-[9999] w-96 max-w-[calc(100vw-var(--sidebar-width)-2rem)] md:max-w-96"
             style={{
               left: 'calc(var(--sidebar-width) + 0.5rem)',
               top: `${Math.max(buttonPosition.top - 16, 16)}px`,
@@ -338,7 +339,8 @@ export default function SidebarShareButton({
               </CardContent>
             </Card>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
