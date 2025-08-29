@@ -2,9 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  experimental: {
-    serverComponentsExternalPackages: ['@opentelemetry/api'],
-  },
+  serverExternalPackages: ['@opentelemetry/api'],
+  transpilePackages: ['@supabase/ssr', '@supabase/supabase-js'],
   images: {
     remotePatterns: [
       {
@@ -23,6 +22,21 @@ const nextConfig: NextConfig = {
     ],
   },
   webpack: (config, { isServer }) => {
+    // Resolve Supabase module issues
+    config.resolve = config.resolve || {};
+    config.resolve.alias = config.resolve.alias || {};
+    
+    // Ensure proper module resolution for Supabase packages
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        crypto: false,
+      };
+    }
+
     // Only ignore warnings, don't interfere with module resolution
     config.ignoreWarnings = [
       { module: /node_modules\/@opentelemetry/ },

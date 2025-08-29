@@ -12,8 +12,8 @@ import {
   User,
   Home,
   Inbox,
-  ChevronDown,
-  Edit3,
+  // ChevronDown,
+  // Edit3,
   FolderPlus,
 } from "lucide-react";
 import { useState } from "react";
@@ -219,13 +219,13 @@ export default function AppSidebar() {
               {displayName}&apos;s Workspace
             </span>
           </div>
-          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+          {/* <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
             <ChevronDown className="h-4 w-4" />
-          </Button>
+          </Button> */}
         </div>
-        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 self-start">
+        {/* <Button variant="ghost" size="sm" className="h-6 w-6 p-0 self-start">
           <Edit3 className="h-4 w-4" />
-        </Button>
+        </Button> */}
       </SidebarHeader>
 
       <SidebarContent>
