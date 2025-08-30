@@ -92,23 +92,26 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
   // Define document with children type
   type DocumentWithChildren = Document & { children: DocumentWithChildren[] };
 
-  // Build hierarchical document tree for sidebar
+  // Build hierarchical document tree - adapted from DocumentTree component
   const buildDocumentTree = (): DocumentWithChildren[] => {
     const allDocs = [mainDocument, ...childDocuments];
     const docMap = new Map<string, DocumentWithChildren>();
-    
-    // First pass: create map with children arrays
+    const roots: DocumentWithChildren[] = [];
+
+    // First pass: create map of all documents
     allDocs.forEach(doc => {
       docMap.set(doc.id, { ...doc, children: [] });
     });
 
     // Second pass: build tree structure
-    const roots: DocumentWithChildren[] = [];
     allDocs.forEach(doc => {
       const node = docMap.get(doc.id)!;
-      if (doc.parent_id && docMap.has(doc.parent_id)) {
-        const parent = docMap.get(doc.parent_id)!;
-        parent.children.push(node);
+      if (doc.parent_id) {
+        const parent = docMap.get(doc.parent_id);
+        if (parent) {
+          parent.children = parent.children || [];
+          parent.children.push(node);
+        }
       } else {
         roots.push(node);
       }
@@ -118,7 +121,7 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
     const sortNodes = (nodes: DocumentWithChildren[]) => {
       nodes.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
       nodes.forEach(node => {
-        if (node.children.length > 0) {
+        if (node.children && node.children.length > 0) {
           sortNodes(node.children);
         }
       });
@@ -128,94 +131,72 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
     return roots;
   };
 
-  // Simple document tree renderer
-  const renderSimpleDocumentTree = (docs: DocumentWithChildren[]): React.ReactNode[] => {
-    return docs.map(doc => {
-      const isFolder = doc.type === 'folder';
-      const isExpanded = expandedFolders.has(doc.id);
-      const isSelected = selectedDocumentId === doc.id;
-      const hasChildren = doc.children.length > 0;
+  // Document tree renderer - exact copy from DocumentTree without drag/edit features
+  const renderDocumentItem = (doc: DocumentWithChildren, level: number = 0): React.ReactNode => {
+    const isExpanded = expandedFolders.has(doc.id);
+    const isCurrentDocument = doc.id === selectedDocumentId;
 
-      return (
-        <div key={doc.id} className="w-full">
-          <div
-            className={`flex items-center space-x-2 px-2 py-2 sm:py-1 rounded transition-colors ${
-              isFolder 
-                ? 'cursor-default' 
-                : `cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
-                    isSelected ? 'bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary' : ''
-                  }`
-            }`}
-            onClick={() => !isFolder && selectDocument(doc.id)}
-          >
-            {/* Chevron for folders with children */}
-            {isFolder && hasChildren ? (
-              <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleFolder(doc.id);
-                }}
-                className="p-1 hover:bg-sidebar-accent rounded cursor-pointer"
-              >
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                )}
-              </div>
-            ) : (
-              <div className="w-6" />
-            )}
-            
-            {/* Icon */}
-            {isFolder ? (
-              <Folder className="h-4 w-4 text-primary flex-shrink-0" />
-            ) : (
-              <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            )}
-            
-            {/* Title */}
-            <span className={`flex-1 text-sm truncate text-sidebar-foreground`}>
-              {doc.title}
-            </span>
-          </div>
-          
-          {/* Render children if folder is expanded */}
-          {isFolder && isExpanded && hasChildren && (
-            <div className="ml-6 mt-1 space-y-1">
-              {doc.children.map(child => {
-                const childIsFolder = child.type === 'folder';
-                const childIsSelected = selectedDocumentId === child.id;
-                
-                return (
-                  <div
-                    key={child.id}
-                    className={`flex items-center space-x-2 px-2 py-1 rounded transition-colors ${
-                      childIsFolder 
-                        ? 'cursor-default' 
-                        : `cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
-                            childIsSelected ? 'bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary' : ''
-                          }`
-                    }`}
-                    onClick={() => !childIsFolder && selectDocument(child.id)}
-                  >
-                    <div className="w-6" />
-                    {childIsFolder ? (
-                      <Folder className="h-3 w-3 text-primary flex-shrink-0" />
-                    ) : (
-                      <FileText className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                    )}
-                    <span className={`flex-1 text-xs truncate text-sidebar-foreground`}>
-                      {child.title}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+    return (
+      <div key={doc.id} className="w-full">
+        <div 
+          className={`
+            group flex items-center gap-2 px-2 py-1 rounded-md hover:bg-accent/50 cursor-pointer
+            ${isCurrentDocument ? 'bg-accent text-accent-foreground' : ''}
+          `}
+          style={{ 
+            marginLeft: level > 0 ? `${level * 16}px` : '0'
+          }}
+          onClick={() => {
+            if (doc.type === 'folder') {
+              toggleFolder(doc.id);
+            } else {
+              selectDocument(doc.id);
+            }
+          }}
+        >
+          {/* Folder toggle or spacer */}
+          {doc.type === 'folder' ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFolder(doc.id);
+              }}
+              className="p-1 hover:bg-accent rounded"
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </button>
+          ) : (
+            <div className="w-5" /> // Spacer for alignment
           )}
+
+          {/* Icon */}
+          {doc.type === 'folder' ? (
+            <Folder className="h-4 w-4 text-blue-500" />
+          ) : (
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          )}
+
+          {/* Title */}
+          <span 
+            className="flex-1 text-sm truncate"
+            onClick={() => doc.type === 'document' && selectDocument(doc.id)}
+          >
+            {doc.title || 'Untitled'}
+          </span>
         </div>
-      );
-    });
+
+        {/* Render children if folder is expanded */}
+        {doc.type === 'folder' && isExpanded && doc.children && (
+          <div>
+            {doc.children.map(child => renderDocumentItem(child, level + 1))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const treeData = buildDocumentTree();
@@ -232,8 +213,8 @@ export default function PreviewDocument({ mainDocument, childDocuments }: Previe
         </div>
         
         <div className="flex-1 overflow-y-auto p-2">
-          <div className="space-y-1">
-            {renderSimpleDocumentTree(treeData)}
+          <div className="w-full space-y-1">
+            {treeData.map(doc => renderDocumentItem(doc))}
           </div>
         </div>
         

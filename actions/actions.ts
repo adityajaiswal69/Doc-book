@@ -30,8 +30,6 @@ function createAnonymousSupabaseClient() {
 export async function createDocument(userId: string) {
   try {
     const supabase = await createServerSupabaseClient()
-    
-    console.log('Creating document for user:', userId)
 
     // Get the next order index for root level
     const { data: rootDocs, error: rootError } = await supabase
@@ -69,8 +67,6 @@ export async function createDocument(userId: string) {
       throw new Error(`Failed to create document: ${documentError.message}`)
     }
 
-    console.log('Document created:', document.id)
-
     // Create user room relationship
     const { data: userRoom, error: userRoomError } = await supabase
       .from('user_rooms')
@@ -89,7 +85,7 @@ export async function createDocument(userId: string) {
       throw new Error(`Failed to create user room: ${userRoomError.message}`)
     }
 
-    console.log('User room created successfully:', userRoom)
+
 
     return { docId: document.id }
   } catch (error) {
@@ -102,7 +98,7 @@ export async function getDocuments(userId: string) {
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Fetching documents for user:', userId)
+
 
     // Fetch user rooms (permissions)
     const { data: userRooms, error: userRoomsError } = await supabase
@@ -115,12 +111,12 @@ export async function getDocuments(userId: string) {
       throw new Error(`Failed to fetch user rooms: ${userRoomsError.message}`)
     }
 
-    console.log('User rooms found:', userRooms?.length || 0)
+
 
     // Fetch documents for rooms user has access to
     if (userRooms && userRooms.length > 0) {
       const roomIds = userRooms.map(ur => ur.room_id)
-      console.log('Fetching documents for room IDs:', roomIds)
+
       
       const { data: documents, error: documentsError } = await supabase
         .from('documents')
@@ -132,10 +128,10 @@ export async function getDocuments(userId: string) {
         throw new Error(`Failed to fetch documents: ${documentsError.message}`)
       }
       
-      console.log('Documents found:', documents?.length || 0)
+
       return { documents: documents || [], userRooms: userRooms || [] }
     } else {
-      console.log('No user rooms found')
+
       return { documents: [], userRooms: userRooms || [] }
     }
   } catch (error) {
@@ -148,7 +144,7 @@ export async function getDocument(id: string, userId: string) {
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Fetching document with ID:', id, 'for user:', userId)
+
 
     // First check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -175,7 +171,7 @@ export async function getDocument(id: string, userId: string) {
       throw new Error(`Failed to fetch document: ${documentError.message}`)
     }
 
-    console.log('Document fetched:', document)
+
     return { document }
   } catch (error) {
     console.error('Error in getDocument:', error)
@@ -187,14 +183,7 @@ export async function updateDocument(id: string, updates: { title?: string; cont
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Updating document with ID:', id, 'for user:', userId)
-    console.log('Update type:', updates.title ? 'title' : updates.content ? 'content' : updates.blocks_content ? 'blocks' : 'both')
-    if (updates.content) {
-      console.log('Content length:', updates.content.length, 'characters')
-    }
-    if (updates.blocks_content) {
-      console.log('Blocks count:', Array.isArray(updates.blocks_content) ? updates.blocks_content.length : 'not array')
-    }
+
 
     // First check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -204,7 +193,7 @@ export async function updateDocument(id: string, updates: { title?: string; cont
       .eq('room_id', id)
       .single()
 
-    console.log('User room check result:', { userRoom, userRoomError })
+
 
     if (userRoomError) {
       console.error('Error checking user room access:', userRoomError)
@@ -238,13 +227,7 @@ export async function updateDocument(id: string, updates: { title?: string; cont
       throw new Error(`Failed to update document: ${documentError.message}`)
     }
 
-    console.log('Document updated successfully:', {
-      id: document.id,
-      titleLength: document.title?.length || 0,
-      contentLength: document.content?.length || 0,
-      blocksCount: Array.isArray(document.blocks_content) ? document.blocks_content.length : 0,
-      updatedAt: document.updated_at
-    })
+
     
     return { document }
   } catch (error) {
@@ -257,7 +240,7 @@ export async function testDatabaseConnection(userId: string) {
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Testing database connection for user:', userId)
+
 
     // Test 1: Check if we can fetch user rooms
     const { data: userRooms, error: userRoomsError } = await supabase
@@ -265,7 +248,7 @@ export async function testDatabaseConnection(userId: string) {
       .select('*')
       .eq('user_id', userId)
 
-    console.log('User rooms test:', { data: userRooms, error: userRoomsError })
+
 
     // Test 2: Check if we can fetch documents
     if (userRooms && userRooms.length > 0) {
@@ -275,7 +258,7 @@ export async function testDatabaseConnection(userId: string) {
         .select('*')
         .in('id', roomIds)
 
-      console.log('Documents test:', { data: documents, error: documentsError })
+
     }
 
     return { userRooms, error: userRoomsError }
@@ -289,7 +272,7 @@ export async function checkUserDocumentAccess(userId: string, documentId: string
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Checking user access to document:', { userId, documentId })
+
 
     // Check if document exists
     const { data: document, error: documentError } = await supabase
@@ -321,7 +304,7 @@ export async function checkUserDocumentAccess(userId: string, documentId: string
       return { hasAccess: false, reason: 'No user room relationship found', document, userRoom: null }
     }
 
-    console.log('User has access to document')
+
     return { hasAccess: true, reason: 'Access granted', document, userRoom }
   } catch (error) {
     console.error('Error in checkUserDocumentAccess:', error)
@@ -333,13 +316,13 @@ export async function repairUserDocumentAccess(userId: string, documentId: strin
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Attempting to repair user access to document:', { userId, documentId })
+
 
     // First check current access
     const accessCheck = await checkUserDocumentAccess(userId, documentId)
     
     if (accessCheck.hasAccess) {
-      console.log('User already has access, no repair needed')
+
       return { success: true, message: 'Access already exists' }
     }
 
@@ -364,7 +347,7 @@ export async function repairUserDocumentAccess(userId: string, documentId: strin
       throw new Error(`Failed to repair access: ${userRoomError.message}`)
     }
 
-    console.log('Successfully repaired user access')
+
     return { success: true, message: 'Access repaired successfully', userRoom }
   } catch (error) {
     console.error('Error in repairUserDocumentAccess:', error)
@@ -376,7 +359,7 @@ export async function deleteDocument(documentId: string, userId: string) {
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Deleting document with ID:', documentId, 'for user:', userId)
+
 
     // First check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -418,7 +401,7 @@ export async function deleteDocument(documentId: string, userId: string) {
       throw new Error(`Failed to delete document: ${deleteDocumentError.message}`)
     }
 
-    console.log('Document deleted successfully')
+
     return { success: true, message: 'Document deleted successfully' }
   } catch (error) {
     console.error('Error in deleteDocument:', error)
@@ -430,7 +413,7 @@ export async function createFolder(userId: string, parentId?: string) {
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Creating folder for user:', userId, 'parentId:', parentId)
+
 
     // Get the next order index for the parent
     let orderIndex = 0;
@@ -487,7 +470,7 @@ export async function createFolder(userId: string, parentId?: string) {
       throw new Error(`Failed to create folder: ${folderError.message}`)
     }
 
-    console.log('Folder created:', folder.id)
+
 
     // Create user room relationship
     const { data: userRoom, error: userRoomError } = await supabase
@@ -507,7 +490,7 @@ export async function createFolder(userId: string, parentId?: string) {
       throw new Error(`Failed to create user room: ${userRoomError.message}`)
     }
 
-    console.log('User room created successfully:', userRoom)
+
 
     return { folderId: folder.id }
   } catch (error) {
@@ -520,7 +503,7 @@ export async function createDocumentInFolder(userId: string, parentId?: string) 
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Creating document in folder for user:', userId, 'parentId:', parentId)
+
 
     // Get the next order index for the parent
     let orderIndex = 0;
@@ -577,7 +560,7 @@ export async function createDocumentInFolder(userId: string, parentId?: string) 
       throw new Error(`Failed to create document: ${documentError.message}`)
     }
 
-    console.log('Document created:', document.id)
+
 
     // Create user room relationship
     const { data: userRoom, error: userRoomError } = await supabase
@@ -597,7 +580,7 @@ export async function createDocumentInFolder(userId: string, parentId?: string) 
       throw new Error(`Failed to create user room: ${userRoomError.message}`)
     }
 
-    console.log('User room created successfully:', userRoom)
+
 
     return { docId: document.id }
   } catch (error) {
@@ -610,7 +593,7 @@ export async function renameDocument(documentId: string, newTitle: string, userI
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Renaming document with ID:', documentId, 'to:', newTitle, 'for user:', userId)
+
 
     // First check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -641,7 +624,7 @@ export async function renameDocument(documentId: string, newTitle: string, userI
       throw new Error(`Failed to update document title: ${documentError.message}`)
     }
 
-    console.log('Document renamed successfully:', document)
+
     return { document }
   } catch (error) {
     console.error('Error in renameDocument:', error)
@@ -653,7 +636,7 @@ export async function moveDocument(documentId: string, newParentId: string | nul
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Moving document with ID:', documentId, 'to parent:', newParentId, 'for user:', userId)
+
 
     // First check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -737,7 +720,7 @@ export async function moveDocument(documentId: string, newParentId: string | nul
       throw new Error(`Failed to move document: ${documentError.message}`)
     }
 
-    console.log('Document moved successfully:', document)
+
     return { document }
   } catch (error) {
     console.error('Error in moveDocument:', error)
@@ -755,7 +738,7 @@ export async function uploadImage(
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Uploading image for document:', documentId, 'block:', blockId, 'user:', userId)
+
     console.log('File details:', {
       name: file.name,
       size: file.size,
@@ -916,7 +899,7 @@ export async function uploadImage(
       throw new Error(`Failed to store image metadata: ${imageError.message}`)
     }
 
-    console.log('Image uploaded successfully:', imageData)
+
     
     // Optional: Run cleanup of deleted images in background (don't await to avoid blocking)
     cleanupMarkedForDeletion().catch(error => 
@@ -945,7 +928,7 @@ export async function addExternalImage(
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Adding external image for document:', documentId, 'block:', blockId, 'user:', userId)
+
 
     // Check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -983,7 +966,7 @@ export async function addExternalImage(
       throw new Error(`Failed to store image metadata: ${imageError.message}`)
     }
 
-    console.log('External image added successfully:', imageData)
+
     return { 
       success: true, 
       imageData,
@@ -999,7 +982,7 @@ export async function deleteImage(documentId: string, blockId: string, userId: s
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Deleting image for document:', documentId, 'block:', blockId, 'user:', userId)
+
 
     // Check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -1093,7 +1076,7 @@ export async function deleteImage(documentId: string, blockId: string, userId: s
       throw new Error(`Failed to delete image: ${deleteError.message}`)
     }
 
-    console.log('Image deleted successfully')
+
     return { success: true, message: 'Image deleted successfully' }
   } catch (error) {
     console.error('Error in deleteImage:', error)
@@ -1111,7 +1094,7 @@ export async function uploadVideo(
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Uploading video for document:', documentId, 'block:', blockId, 'user:', userId)
+
     console.log('File details:', {
       name: file.name,
       size: file.size,
@@ -1271,7 +1254,7 @@ export async function uploadVideo(
       throw new Error(`Failed to store video metadata: ${videoError.message}`)
     }
 
-    console.log('Video uploaded successfully:', videoData)
+
     
     return { 
       success: true, 
@@ -1295,7 +1278,7 @@ export async function addExternalVideo(
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Adding external video for document:', documentId, 'block:', blockId, 'user:', userId)
+
 
     // Check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -1325,7 +1308,7 @@ export async function addExternalVideo(
       throw new Error(`Failed to store video metadata: ${videoError.message}`)
     }
 
-    console.log('External video added successfully:', videoData)
+
     return { 
       success: true, 
       videoData,
@@ -1341,7 +1324,7 @@ export async function deleteVideo(documentId: string, blockId: string, userId: s
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Deleting video for document:', documentId, 'block:', blockId, 'user:', userId)
+
 
     // Check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -1435,7 +1418,7 @@ export async function deleteVideo(documentId: string, blockId: string, userId: s
       throw new Error(`Failed to delete video: ${deleteError.message}`)
     }
 
-    console.log('Video deleted successfully')
+
     return { success: true, message: 'Video deleted successfully' }
   } catch (error) {
     console.error('Error in deleteVideo:', error)
@@ -1447,7 +1430,7 @@ export async function getDocumentImages(documentId: string, userId: string) {
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Getting images for document:', documentId, 'user:', userId)
+
 
     // Check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -1526,7 +1509,7 @@ export async function cleanupOrphanedImages(userId: string) {
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Cleaning up orphaned images for user:', userId)
+
 
     // This function should only be called by admin users or system processes
     // For now, we'll add a basic check
@@ -1590,7 +1573,7 @@ export async function toggleDocumentSharing(id: string, isPublic: boolean, share
   try {
     const supabase = await createServerSupabaseClient()
     
-    console.log('Toggling sharing for document:', id, 'for user:', userId)
+
 
     // Check if user has access to this document
     const { data: userRoom, error: userRoomError } = await supabase
@@ -1600,7 +1583,7 @@ export async function toggleDocumentSharing(id: string, isPublic: boolean, share
       .eq('room_id', id)
       .single()
 
-    console.log('User room check result:', { userRoom, userRoomError })
+
 
     if (userRoomError || !userRoom) {
       console.error('User does not have access to document:', id, 'Error:', userRoomError)
@@ -1639,7 +1622,7 @@ export async function toggleDocumentSharing(id: string, isPublic: boolean, share
       throw new Error(`Failed to toggle document sharing: ${error.message}`)
     }
 
-    console.log('Document sharing toggled successfully:', data)
+
     return data
   } catch (error) {
     console.error('Error in toggleDocumentSharing:', error)
@@ -1657,69 +1640,35 @@ export async function getSharedDocument(token: string) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // First, check if any documents exist with this token (regardless of public status)
-    console.log('Checking if any documents exist with this token...')
-    const { data: allDocs, error: allDocsError } = await supabase
+    // First, find the main document with the token
+    console.log('Finding main document with token...')
+    const { data: mainDoc, error: mainDocError } = await supabase
       .from('documents')
-      .select('id, title, is_public, preview_token')
+      .select('*')
       .eq('preview_token', token)
+      .eq('is_public', true)
+      .single()
 
-    if (allDocsError) {
-      console.error('Error checking documents:', allDocsError)
-    } else {
-      console.log(`Found ${allDocs?.length || 0} documents with token ${token}`)
-      if (allDocs && allDocs.length > 0) {
-        allDocs.forEach((doc, index) => {
-          console.log(`  ${index + 1}. ${doc.title} (public: ${doc.is_public})`)
-        })
-      }
+    if (mainDocError || !mainDoc) {
+      console.log('❌ No public document found with token:', token)
+      return createDemoDocument(token, 'No public document found with this token.')
     }
 
-    // Try the RPC function first (most reliable)
-    console.log('Trying get_shared_documents RPC function...')
-    const { data: rpcData, error: rpcError } = await supabase
-      .rpc('get_shared_documents', { token })
+    console.log('✅ Found main document:', mainDoc.title, 'share_children:', mainDoc.share_children)
 
-    if (rpcError) {
-      console.error('RPC function error:', rpcError)
-      
-      // Fallback to direct query
-      console.log('Falling back to direct query...')
-      const { data: directData, error: directError } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('preview_token', token)
-        .eq('is_public', true)
+    // Start with the main document
+    const allDocuments = [mainDoc]
 
-      if (directError) {
-        console.error('Direct query error:', directError)
-        throw new Error(`Database error: ${directError.message}`)
-      }
-
-      if (!directData || directData.length === 0) {
-        console.log('❌ No public document found with token:', token)
-        console.log('💡 To fix this:')
-        console.log('1. Run the SQL migration in Supabase dashboard')
-        console.log('2. Create a document and set is_public = true')
-        console.log('3. Or run: node create-test-public-doc.js')
-        return createDemoDocument(token, 'No public document found. Run the SQL migration and create a public document.')
-      }
-
-      console.log('✅ Direct query found documents:', directData.length)
-      return directData
+    // If the main document has share_children = true, recursively get all descendants
+    if (mainDoc.share_children) {
+      console.log('🔄 Main document shares children, fetching all descendants...')
+      const descendants = await getAllDescendants(supabase, mainDoc.id)
+      allDocuments.push(...descendants)
+      console.log(`✅ Found ${descendants.length} descendant documents`)
     }
 
-    if (!rpcData || rpcData.length === 0) {
-      console.log('❌ RPC function returned no documents for token:', token)
-      console.log('💡 This means either:')
-      console.log('1. No document exists with this token')
-      console.log('2. The document exists but is not public (is_public = false)')
-      console.log('3. The SQL migration has not been run yet')
-      return createDemoDocument(token, 'No public document found. Check if the document exists and is marked as public.')
-    }
-
-    console.log('✅ RPC function found documents:', rpcData.length)
-    return rpcData
+    console.log('✅ Total documents returned:', allDocuments.length)
+    return allDocuments
 
   } catch (error) {
     console.error('❌ Error in getSharedDocument:', error)
@@ -1727,9 +1676,40 @@ export async function getSharedDocument(token: string) {
   }
 }
 
+// Helper function to recursively get all descendants of a document/folder
+async function getAllDescendants(supabase: any, parentId: string): Promise<any[]> {
+  const { data: children, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('parent_id', parentId)
+    .order('order_index')
+
+  if (error) {
+    console.error('Error fetching children:', error)
+    return []
+  }
+
+  if (!children || children.length === 0) {
+    return []
+  }
+
+  const allDescendants = [...children]
+
+  // For each child that is a folder, recursively get its children
+  for (const child of children) {
+    if (child.type === 'folder') {
+      console.log(`🔄 Getting descendants of folder: ${child.title}`)
+      const grandchildren = await getAllDescendants(supabase, child.id)
+      allDescendants.push(...grandchildren)
+    }
+  }
+
+  return allDescendants
+}
+
 // Helper function to create demo documents
 function createDemoDocument(token: string, reason: string) {
-  console.log('Creating demo document for token:', token, 'Reason:', reason)
+  
   
   const demoDocument = {
     id: 'demo-doc-' + Date.now(),
